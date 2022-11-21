@@ -10,7 +10,7 @@ def get_array_from_file(filename):
 
     image = Image.open(filename)
     image_array = np.array(image, dtype=np.float64)
-    return image_array[:,::-1]
+    return image_array
 
 
 def display_image_array(image_array):
