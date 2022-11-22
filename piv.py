@@ -83,12 +83,63 @@ def get_frame_vorticity(V_array, dx, dy):
             elif i == Ny-1:
                 du_dy = (V_array[i-1,j,0] - V_array[i,j,0])/dy
             else:
-                du_dy = (V_array[i-1,j,0] - V_array[i+1,j,0])/dy
+                du_dy = 0.5*(V_array[i-1,j,0] - V_array[i+1,j,0])/dy
         
             # Calculate vorticity
             zeta_array[i,j] = du_dy - dv_dx
 
     return zeta_array
+
+
+def apply_median_filter(V_array, e_thresh, e0):
+    """Applies median filtering to the given velocity array.
+
+    Parameters
+    ----------
+    V_array : ndarray
+        Velocity array on which to apply median filtering.
+
+    e_thresh : float
+        Normalized threshold for filtering the data.
+
+    e0 : float
+        Normalizer (to avoid division by zero).
+
+    Returns
+    -------
+    ndarray
+        Filtered velocity array.
+    """
+
+    # Get data limits
+    Ni, Nj, _ = V_array.shape
+
+    # Initialize new array
+    V_filtered = np.zeros_like(V_array)
+
+    # Loop
+    for i in range(Ni):
+        for j in range(Nj):
+
+            # Get neighbors
+            i_min = max(0, i-1)
+            i_max = min(Ni, i+2)
+            j_min = max(0, j-1)
+            j_max = min(Ni, j+2)
+
+            # Get statistics
+            u_med = np.median(V_array[i_min:i_max,j_min:j_max,0].flatten()).item()
+            v_med = np.median(V_array[i_min:i_max,j_min:j_max,1].flatten()).item()
+            u_std = np.std(V_array[i_min:i_max,j_min:j_max,0].flatten(), ddof=1).item()
+            v_std = np.std(V_array[i_min:i_max,j_min:j_max,1].flatten(), ddof=1).item()
+
+            # Check
+            if abs(V_array[i,j,0]-u_med)/(u_std*e0) > e_thresh or abs(V_array[i,j,1]-v_med)/(v_std*e0) > e_thresh:
+                V_filtered[i,j,:] = [u_med, v_med]
+            else:
+                V_filtered[i,j,:] = V_array[i,j,:]
+
+    return V_filtered
 
 
 class TimeSeriesPIVAnalysis:
@@ -164,14 +215,17 @@ class TimeSeriesPIVAnalysis:
             self.perform_background_subtraction()
 
         # Get vector spacing
+        self.window_size = window_size
         if vector_spacing == None:
-            vector_spacing = window_size
+            self.vector_spacing = self.window_size
+        else:
+            self.vector_spacing = vector_spacing
 
         # Determien vector locations
-        self.calc_vector_locations(window_size, vector_spacing)
+        self.calc_vector_locations()
 
         # Compute velocities
-        self.compute_velocities(window_size, vector_spacing)
+        self.compute_velocities()
 
         # Compute vorticities
         self.calculate_vorticities()
@@ -187,84 +241,92 @@ class TimeSeriesPIVAnalysis:
         self.subtracted_data = self.time_series_array - self.average_image
 
 
-    def calc_vector_locations(self, window_size, vector_spacing):
-        """Calculates the dimensional locations of each velocity vector.
-
-        Parameters
-        ----------
-        vector_spacing : int
-            Spacing between output vectors in pixels.
-
-        window_size : int
-            Interrogation window size.
-        """
+    def calc_vector_locations(self):
+        """Calculates the dimensional locations of each velocity vector."""
 
         # Get number of vectors
-        self.Nu = (self.Nx-window_size)//vector_spacing + 1
-        self.Nv = (self.Ny-window_size)//vector_spacing + 1
+        self.N_vels_in_x = (self.Nx-self.window_size)//self.vector_spacing + 1
+        self.N_vels_in_y = (self.Ny-self.window_size)//self.vector_spacing + 1
 
         # Determine pixel sizes
         self.dx = (self.x_lims[1] - self.x_lims[0]) / self.Nx
         self.dy = (self.y_lims[1] - self.y_lims[0]) / self.Ny
 
         # Determine dimensional vector spacing
-        self.vec_spacing_x = vector_spacing*self.dx
-        self.vec_spacing_y = vector_spacing*self.dy
+        self.vec_spacing_x = self.vector_spacing*self.dx
+        self.vec_spacing_y = self.vector_spacing*self.dy
 
         # Initialize location storage
-        self.x_vec = np.zeros(self.Nu)
-        self.y_vec = np.zeros(self.Nv)
+        self.x_vec = np.zeros(self.N_vels_in_x)
+        self.y_vec = np.zeros(self.N_vels_in_y)
 
         # Calculate x locations
-        for i in range(self.Nu):
-            self.x_vec[i] = (window_size//2 + i*vector_spacing)*self.dx
+        for i in range(self.N_vels_in_x):
+            self.x_vec[i] = (self.window_size//2 + i*self.vector_spacing)*self.dx
 
         # Calculate y locations
-        for i in range(self.Nv):
-            self.y_vec[i] = -(window_size//2 + i*vector_spacing)*self.dy
+        for i in range(self.N_vels_in_y):
+            self.y_vec[i] = -(self.window_size//2 + i*self.vector_spacing)*self.dy
 
-
-    def compute_velocities(self, window_size, vector_spacing):
-        """Computes the cross-correlations of the given time-series data.
+    
+    def compute_frame_velocities(self, i):
+        """Calculates the velocities from two frames.
 
         Parameters
         ----------
-        window_size : int
-            Interrogation window size.
-
-        vector_spacing : int, optional
-            Spacing between output vectors in pixels. Defaults to the interrogation window size.
+        i : int
+            Index of first frame.
         """
 
-        prog = OneLineProgress(self.Nu*self.Nv, "Calculating {0} velocity vectors for {1} samples...".format(self.Nu*self.Nv, self.N-1))
-
-        # Initialize memory
-        self.V = np.zeros((self.N-1, self.Nu, self.Nv, 2))
+        V = np.zeros((self.N_vels_in_y, self.N_vels_in_x, 2))
 
         # Loop through in x direction
-        for j in range(self.Nu):
+        for j in range(self.N_vels_in_x):
 
             # Loop through in y direction
-            for k in range(self.Nv):
+            for k in range(self.N_vels_in_y):
                     
                 # Figure out our window indices
-                j0 = j*vector_spacing
-                j1 = j0 + window_size
-                k0 = k*vector_spacing
-                k1 = k0 + window_size
+                j0 = j*self.vector_spacing
+                j1 = j0 + self.window_size
+                k0 = k*self.vector_spacing
+                k1 = k0 + self.window_size
 
-                # Loop through samples
-                for i in range(self.N-1):
+                # Calculate offset
+                j_offset = int(self.V[i,j,k,0]*self.dt/self.dx)
+                k_offset = int(-self.V[i,j,k,1]*self.dt/self.dy)
 
-                    # Get windows
-                    window1 = self.time_series_array[i,j0:j1,k0:k1]
-                    window2 = self.time_series_array[i+1,j0:j1,k0:k1]
+                # Get windows
+                window1 = self.time_series_array[i,j0:j1,k0:k1]
+                window2 = self.time_series_array[i+1,j0+j_offset:j1+j_offset,k0+k_offset:k1+k_offset]
 
-                    # Cross-correlate
-                    peak = get_correlation_peak(window1, window2)
-                    self.V[i,j,k,0] = -peak[1]*self.dx/self.dt
-                    self.V[i,j,k,1] =  peak[0]*self.dy/self.dt
+                # Cross-correlate
+                peak = get_correlation_peak(window1, window2)
+                V[j,k,0] = -peak[1]*self.dx/self.dt
+                V[j,k,1] =  peak[0]*self.dy/self.dt
 
+        return V
+
+
+    def compute_velocities(self):
+        """Computes the raw velocities from the given time-series data."""
+
+        # Initialize memory
+        self.V = np.zeros((self.N-1, self.N_vels_in_x, self.N_vels_in_y, 2))
+
+        # Window offset loop
+        for iteration in range(2):
+
+            # Calculate velocities
+            prog = OneLineProgress(self.N-1, "Calculating {0} velocity vectors for {1} samples...".format(self.N_vels_in_x*self.N_vels_in_y, self.N-1))
+            for i in range(self.N-1):
+                self.V[i] = self.compute_frame_velocities(i)
+                prog.display()
+
+            # Apply median filter
+            prog = OneLineProgress(self.N-1, "Applying median filter...")
+            for i in range(self.N-1):
+                self.V[i] = apply_median_filter(self.V[i], 2.0, 1.0)
                 prog.display()
 
     
@@ -272,7 +334,7 @@ class TimeSeriesPIVAnalysis:
         """Calculates the vorticities from the data."""
 
         # Initialize storage
-        self.zeta = np.zeros((self.N-1, self.Nu, self.Nv))
+        self.zeta = np.zeros((self.N-1, self.N_vels_in_x, self.N_vels_in_y))
 
         prog = OneLineProgress(self.N-1, "Calculating vorticities...")
         for i in range(self.N-1):
@@ -303,8 +365,8 @@ class TimeSeriesPIVAnalysis:
                 print("x,y,z,u,v,zeta", file=output_handle)
 
                 # Loop through points
-                for j in range(self.Nu):
-                    for k in range(self.Nv):
+                for j in range(self.N_vels_in_x):
+                    for k in range(self.N_vels_in_y):
                         print("{0},{1},{2},{3},{4},{5}".format(self.x_vec[j], self.y_vec[k], 0.0, self.V[i,j,k,0], self.V[i,j,k,1], self.zeta[i,j,k]), file=output_handle)
 
             prog.display()
