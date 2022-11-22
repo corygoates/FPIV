@@ -13,6 +13,17 @@ def get_array_from_file(filename):
     return image_array
 
 
+def get_double_image_from_file(filename):
+    # Reads in an image file where two images are concatenated on top of each other
+
+    double_array = get_array_from_file(filename)
+    N_rows = double_array.shape[0]
+    first_image = double_array[:N_rows//2,:]
+    second_image = double_array[N_rows//2:,:]
+
+    return first_image, second_image
+
+
 def display_image_array(image_array):
     # Displays the given image array
 

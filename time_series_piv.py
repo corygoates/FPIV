@@ -1,148 +1,10 @@
-import os
-
 import numpy as np
-import scipy.signal as sig
 
+from base_piv import BasePIVAnalysis
 from image_handling import get_array_from_file, get_sample_filename, display_image_array
-from helpers import OneLineProgress
 
 
-def get_correlation_peak(array1, array2):
-    """Locates the correlation peak between two arrays.
-    
-    Parameters
-    ----------
-    array1 : ndarray
-        First array.
-        
-    array2 : ndarray
-        Second array.
-
-    Returns
-    -------
-    list
-        Coordinates of correlation peak.
-    """
-
-    # Cross-correlate
-    avg1 = np.average(array1.flatten()).item()
-    avg2 = np.average(array2.flatten()).item()
-    corr = sig.correlate(array1-avg1, array2-avg2, method='fft', mode='same')
-
-    # Find maximum
-    max_corr = 0.0
-    for  i in range(corr.shape[0]):
-        for j in range(corr.shape[1]):
-            if corr[i,j] > max_corr:
-                i_max = i
-                j_max = j
-                max_corr = corr[i,j]
-
-    return [i_max-array1.shape[0]//2, j_max-array1.shape[1]//2]
-
-
-def get_frame_vorticity(V_array, dx, dy):
-    """Calculates the vorticity of the given velocity field.
-
-    Parameters
-    ----------
-    V_array : ndarray
-        Array of the velocity components at each point in space.
-
-    dx : float
-        Dimensional vector spacing in the x-direction.
-
-    dy : float
-        Dimensional vector spacing in the y-direction.
-
-    Returns
-    -------
-    ndarray
-        Vorticity array.
-    """
-
-    # Initialize storage
-    Ny, Nx, _ = V_array.shape
-    zeta_array = np.zeros((Ny, Nx))
-
-    # Loop
-    for i in range(Ny):
-        for j in range(Nx):
-
-            # Get dv/dx
-            if j == 0:
-                dv_dx = (V_array[i,j+1,1] - V_array[i,j,1])/dx
-            elif j == Nx-1:
-                dv_dx = (V_array[i,j,1] - V_array[i,j-1,1])/dx
-            else:
-                dv_dx = 0.5*(V_array[i,j+1,1] - V_array[i,j-1,1])/dx
-
-            # Get du/dy
-            if i == 0:
-                du_dy = (V_array[i,j,0] - V_array[i+1,j,0])/dy
-            elif i == Ny-1:
-                du_dy = (V_array[i-1,j,0] - V_array[i,j,0])/dy
-            else:
-                du_dy = 0.5*(V_array[i-1,j,0] - V_array[i+1,j,0])/dy
-        
-            # Calculate vorticity
-            zeta_array[i,j] = du_dy - dv_dx
-
-    return zeta_array
-
-
-def apply_median_filter(V_array, e_thresh, e0):
-    """Applies median filtering to the given velocity array.
-
-    Parameters
-    ----------
-    V_array : ndarray
-        Velocity array on which to apply median filtering.
-
-    e_thresh : float
-        Normalized threshold for filtering the data.
-
-    e0 : float
-        Normalizer (to avoid division by zero).
-
-    Returns
-    -------
-    ndarray
-        Filtered velocity array.
-    """
-
-    # Get data limits
-    Ni, Nj, _ = V_array.shape
-
-    # Initialize new array
-    V_filtered = np.zeros_like(V_array)
-
-    # Loop
-    for i in range(Ni):
-        for j in range(Nj):
-
-            # Get neighbors
-            i_min = max(0, i-1)
-            i_max = min(Ni, i+2)
-            j_min = max(0, j-1)
-            j_max = min(Ni, j+2)
-
-            # Get statistics
-            u_med = np.median(V_array[i_min:i_max,j_min:j_max,0].flatten()).item()
-            v_med = np.median(V_array[i_min:i_max,j_min:j_max,1].flatten()).item()
-            u_std = np.std(V_array[i_min:i_max,j_min:j_max,0].flatten(), ddof=1).item()
-            v_std = np.std(V_array[i_min:i_max,j_min:j_max,1].flatten(), ddof=1).item()
-
-            # Check
-            if abs(V_array[i,j,0]-u_med)/(u_std*e0) > e_thresh or abs(V_array[i,j,1]-v_med)/(v_std*e0) > e_thresh:
-                V_filtered[i,j,:] = [u_med, v_med]
-            else:
-                V_filtered[i,j,:] = V_array[i,j,:]
-
-    return V_filtered
-
-
-class TimeSeriesPIVAnalysis:
+class TimeSeriesPIVAnalysis(BasePIVAnalysis):
     """Class for performing an storing a PIV analysis on time-series data.
     Loads a set of time series data into a single array. Assumes the files are stored using 1-based indexing.
 
@@ -194,7 +56,7 @@ class TimeSeriesPIVAnalysis:
             prog.display()
 
 
-    def process(self, window_size, vector_spacing=None, sutract_background=True):
+    def process(self, window_size, vector_spacing, sutract_background=True):
         """Processes the data.
 
         Parameters
@@ -214,15 +76,8 @@ class TimeSeriesPIVAnalysis:
         if sutract_background:
             self.perform_background_subtraction()
 
-        # Get vector spacing
-        self.window_size = window_size
-        if vector_spacing == None:
-            self.vector_spacing = self.window_size
-        else:
-            self.vector_spacing = vector_spacing
-
-        # Determien vector locations
-        self.calc_vector_locations()
+        # Determine vector locations
+        self.set_up_vectors(window_size, vector_spacing)
 
         # Compute velocities
         self.compute_velocities()
@@ -239,34 +94,6 @@ class TimeSeriesPIVAnalysis:
 
         # Subtract
         self.subtracted_data = self.time_series_array - self.average_image
-
-
-    def calc_vector_locations(self):
-        """Calculates the dimensional locations of each velocity vector."""
-
-        # Get number of vectors
-        self.N_vels_in_x = (self.Nx-self.window_size)//self.vector_spacing + 1
-        self.N_vels_in_y = (self.Ny-self.window_size)//self.vector_spacing + 1
-
-        # Determine pixel sizes
-        self.dx = (self.x_lims[1] - self.x_lims[0]) / self.Nx
-        self.dy = (self.y_lims[1] - self.y_lims[0]) / self.Ny
-
-        # Determine dimensional vector spacing
-        self.vec_spacing_x = self.vector_spacing*self.dx
-        self.vec_spacing_y = self.vector_spacing*self.dy
-
-        # Initialize location storage
-        self.x_vec = np.zeros(self.N_vels_in_x)
-        self.y_vec = np.zeros(self.N_vels_in_y)
-
-        # Calculate x locations
-        for i in range(self.N_vels_in_x):
-            self.x_vec[i] = (self.window_size//2 + i*self.vector_spacing)*self.dx
-
-        # Calculate y locations
-        for i in range(self.N_vels_in_y):
-            self.y_vec[i] = -(self.window_size//2 + i*self.vector_spacing)*self.dy
 
     
     def compute_frame_velocities(self, i):
