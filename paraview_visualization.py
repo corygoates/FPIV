@@ -183,7 +183,7 @@ def render_csv_with_paraview(filename):
     arrow_glyph.OrientationArray = ['POINTS', 'V']
     arrow_glyph.ScaleArray = ['POINTS', 'V']
     arrow_glyph.GlyphTransform = 'Transform2'
-    arrow_glyph.ScaleFactor = 0.01
+    arrow_glyph.ScaleFactor = 0.001
 
     # show data in view
     arrow_glyph_display = Show(arrow_glyph, renderView1, 'GeometryRepresentation')
@@ -247,3 +247,4 @@ def render_csv_with_paraview(filename):
     Interact()
     #RenderAllViews()
     # alternatively, if you want to write images, you can use SaveScreenshot(...).
+    SaveScreenshot("image.png")

@@ -13,7 +13,7 @@ if __name__=="__main__":
     #my_piv.write_to_csv("results/synthetic_jet/velocity")
 
     my_piv = BaseballPIVAnalysis("data/baseball_data/baseballs1.tif", 0.001)
-    my_piv.process(2.0, 0.5, 32, vector_spacing=8)
+    my_piv.process(2.0, 0.5, 32, vector_spacing=8, N_passes=5)
     my_piv.write_to_csv("results/baseballs/baseballs1_")
 
     render_csv_with_paraview("results/baseballs/baseballs1_0.csv")

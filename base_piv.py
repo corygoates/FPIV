@@ -91,10 +91,12 @@ class BasePIVAnalysis:
         """
 
         # Initialize storage
-        self.shifts = np.zeros((self.N, self.N_vels_in_y, self.N_vels_in_x, 2))
+        self.shifts = np.zeros((self.N, self.N_vels_in_y, self.N_vels_in_x, 2), dtype=int)
 
         # Loop through passes
         for i in range(N_passes):
+
+            print("Pass ", i)
 
             # Loop through samples
             for l in range(self.N):
@@ -111,9 +113,24 @@ class BasePIVAnalysis:
                         k0 = k*self.vector_spacing
                         k1 = k0 + self.window_size
 
+                        # Get window offset from previous pass
+                        j_shift = self.shifts[l,j,k,0]
+                        k_shift = self.shifts[l,j,k,1]
+
+                        # Limit shifts to stay inside the data bounds
+                        if j0 + j_shift < 0:
+                            j_shift = -j0
+                        elif j1 + j_shift > self.Ny:
+                            j_shift = self.Ny - j1
+
+                        if k0 + k_shift < 0:
+                            k_shift = -k0
+                        elif k1 + k_shift > self.Nx:
+                            k_shift = self.Nx - k1
+
                         # Get windows
                         window1 = self.data[l,j0:j1,k0:k1]
-                        window2 = self.data[l+1,j0:j1,k0:k1]
+                        window2 = self.data[l+1,j0+j_shift:j1+j_shift,k0+k_shift:k1+k_shift]
 
                         # Cross-correlate
                         self.shifts[l,j,k,:] = get_correlation_peak(window1, window2)
