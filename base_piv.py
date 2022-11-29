@@ -1,13 +1,26 @@
 import numpy as np
 
 from analysis import get_correlation_peak
+from helpers import OneLineProgress
 
 class BasePIVAnalysis:
     """Base class for performing PIV analysis."""
 
 
     def __init__(self):
-        pass
+        
+        self.dt = None
+        self.dx = None
+        self.dy = None
+        self.N = None
+        self.data = None
+        self.shifts = None
+        self.V = None
+        self.zeta = None
+        self.N_vels_in_x = None
+        self.N_vels_in_y = None
+        self.vec_spacing_x = None
+        self.vec_spacing_y = None
 
 
     def set_up_vectors(self, window_size, vector_spacing=None):
@@ -53,88 +66,162 @@ class BasePIVAnalysis:
             self.y_vec[i] = -(self.window_size//2 + i*self.vector_spacing)*self.dy
 
 
-    def convert_shifts_to_velocities(self, shift_array):
-        """Takes the given correlation shifts and converts them to velocities.
-        
-        Parameters
-        ----------
-        shift_array : ndarray
-            Array of correlation shifts.
-        """
-
-        # Initialize storage
-        V = np.zeros_like(shift_array)
+    def convert_shifts_to_velocities(self):
+        """Converts the stored shifts to velocities."""
 
         # Calculate velocities
-        V[:,:,0] = -shift_array[:,:,1]*self.dx/self.dt
-        V[:,:,1] =  shift_array[:,:,0]*self.dx/self.dt
+        self.V = np.zeros_like(self.shifts)
+        self.V[:,:,:,0] = -self.shifts[:,:,:,1]*self.dx/self.dt
+        self.V[:,:,:,1] =  self.shifts[:,:,:,0]*self.dy/self.dt
 
-        return V
 
-
-    def calculate_shifts(self, frame1, frame2, N_passes=1):
-        """Calculates the shift field between two image frames.
+    def calculate_shifts(self, e_thresh, e0, N_passes=0):
+        """Calculates the shift fields between the raw data.
         
         Parameters
         ----------
-        frame1 : ndarray
-            First image array.
-        
-        frame2 : ndarray
-            Second image array.
+        e_thresh : float
+            Normalized threshold for filtering the data.
+
+        e0 : float
+            Normalizer (to avoid division by zero).
 
         N_passes : int, optional
             Number of passes using window offsetting. Defaults to 1.
         """
 
         # Initialize storage
-        shifts = np.zeros((self.N_vels_in_y, self.N_vels_in_x, 2))
+        self.shifts = np.zeros((self.N, self.N_vels_in_y, self.N_vels_in_x, 2))
+
+        # Loop through passes
+        for i in range(N_passes):
+
+            # Loop through samples
+            for l in range(self.N):
+
+                # Loop through in x direction
+                for j in range(self.N_vels_in_y):
+
+                    # Loop through in y direction
+                    for k in range(self.N_vels_in_x):
+
+                        # Figure out our window indices
+                        j0 = j*self.vector_spacing
+                        j1 = j0 + self.window_size
+                        k0 = k*self.vector_spacing
+                        k1 = k0 + self.window_size
+
+                        # Get windows
+                        window1 = self.data[l,j0:j1,k0:k1]
+                        window2 = self.data[l+1,j0:j1,k0:k1]
+
+                        # Cross-correlate
+                        self.shifts[l,j,k,:] = get_correlation_peak(window1, window2)
+
+            # Filter
+            self.filter_shifts(e_thresh, e0)
 
 
-    def get_frame_vorticity(V_array):
-        """Calculates the vorticity of the given velocity field.
+    def calculate_vorticities(self):
+        """Calculates the vorticities from the data."""
+
+        # Initialize storage
+        self.zeta = np.zeros((self.N, self.N_vels_in_y, self.N_vels_in_x))
+
+        # Loop
+        for k in range(self.N):
+            for i in range(self.N_vels_in_y):
+                for j in range(self.N_vels_in_x):
+
+                    # Get dv/dx
+                    if j == 0:
+                        dv_dx = (self.V[k,i,j+1,1] - self.V[k,i,j,1])/self.vec_spacing_x
+                    elif j == self.N_vels_in_x-1:
+                        dv_dx = (self.V[k,i,j,1] - self.V[k,i,j-1,1])/self.vec_spacing_x
+                    else:
+                        dv_dx = 0.5*(self.V[k,i,j+1,1] - self.V[k,i,j-1,1])/self.vec_spacing_x
+
+                    # Get du/dy
+                    if i == 0:
+                        du_dy = (self.V[k,i,j,0] - self.V[k,i+1,j,0])/self.vec_spacing_y
+                    elif i == self.N_vels_in_y-1:
+                        du_dy = (self.V[k,i-1,j,0] - self.V[k,i,j,0])/self.vec_spacing_y
+                    else:
+                        du_dy = 0.5*(self.V[k,i-1,j,0] - self.V[k,i+1,j,0])/self.vec_spacing_y
+
+                    # Calculate vorticity
+                    self.zeta[k,i,j] = du_dy - dv_dx
+
+    
+    def filter_shifts(self, e_thresh, e0):
+        """Applies median filtering to the shift array(s).
 
         Parameters
         ----------
-        V_array : ndarray
-            Array of the velocity components at each point in space.
+        e_thresh : float
+            Normalized threshold for filtering the data.
 
-        dx : float
-            Dimensional vector spacing in the x-direction.
-
-        dy : float
-            Dimensional vector spacing in the y-direction.
+        e0 : float
+            Normalizer (to avoid division by zero).
 
         Returns
         -------
         ndarray
-            Vorticity array.
+            Filtered velocity array.
         """
 
-        # Initialize storage
-        zeta_array = np.zeros((self.N_vels_in_y, self.N_vels_in_x))
+        # Initialize new array
+        filtered_shifts = np.zeros_like(self.shifts[0])
 
         # Loop
-        for i in range(Ny):
-            for j in range(Nx):
+        for k in range(self.N):
+            for i in range(self.N_vels_in_y):
+                for j in range(self.N_vels_in_x):
 
-                # Get dv/dx
-                if j == 0:
-                    dv_dx = (V_array[i,j+1,1] - V_array[i,j,1])/self.vec_spacing_x
-                elif j == Nx-1:
-                    dv_dx = (V_array[i,j,1] - V_array[i,j-1,1])/self.vec_spacing_x
-                else:
-                    dv_dx = 0.5*(V_array[i,j+1,1] - V_array[i,j-1,1])/self.vec_spacing_x
+                    # Get neighbors
+                    i_min = max(0, i-1)
+                    i_max = min(self.Ny, i+2)
+                    j_min = max(0, j-1)
+                    j_max = min(self.Nx, j+2)
 
-                # Get du/dy
-                if i == 0:
-                    du_dy = (V_array[i,j,0] - V_array[i+1,j,0])/self.vec_spacing_y
-                elif i == Ny-1:
-                    du_dy = (V_array[i-1,j,0] - V_array[i,j,0])/self.vec_spacing_y
-                else:
-                    du_dy = 0.5*(V_array[i-1,j,0] - V_array[i+1,j,0])/self.vec_spacing_y
+                    # Get statistics
+                    y_shift_med = np.median(self.shifts[k,i_min:i_max,j_min:j_max,0].flatten()).item()
+                    x_shift_med = np.median(self.shifts[k,i_min:i_max,j_min:j_max,1].flatten()).item()
+                    u_std = np.std(self.shifts[k,i_min:i_max,j_min:j_max,0].flatten(), ddof=1).item()
+                    v_std = np.std(self.shifts[k,i_min:i_max,j_min:j_max,1].flatten(), ddof=1).item()
 
-                # Calculate vorticity
-                zeta_array[i,j] = du_dy - dv_dx
+                    # Check
+                    if abs(self.shifts[k,i,j,0]-y_shift_med)/(u_std*e0) > e_thresh or abs(self.shifts[k,i,j,1]-x_shift_med)/(v_std*e0) > e_thresh:
+                        filtered_shifts[i,j,:] = [y_shift_med, x_shift_med]
+                    else:
+                        filtered_shifts[i,j,:] = self.shifts[k,i,j,:]
 
-        return zeta_array
+            # Replace
+            self.shifts[k] = filtered_shifts
+
+    
+    def write_to_csv(self, output_file_root_name):
+        """Writes the data to a series of csv files.
+        
+        Parameters
+        ----------
+        output_file_root_name : str
+            Root name for the output files.
+        """
+
+        # Loop through data
+        for i in range(self.N):
+
+            # Get filename
+            filename = "{0}{1}.csv".format(output_file_root_name, str(i).zfill(len(str(self.N))))
+
+            # Open file
+            with open(filename, 'w') as output_handle:
+
+                # Header
+                print("x,y,z,u,v,zeta", file=output_handle)
+
+                # Loop through points
+                for j in range(self.N_vels_in_y):
+                    for k in range(self.N_vels_in_x):
+                        print("{0},{1},{2},{3},{4},{5}".format(self.x_vec[k], self.y_vec[j], 0.0, self.V[i,j,k,0], self.V[i,j,k,1], self.zeta[i,j,k]), file=output_handle)

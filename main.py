@@ -1,11 +1,16 @@
 import os
 import matplotlib.pyplot as plt
-from piv import TimeSeriesPIVAnalysis
+from time_series_piv import TimeSeriesPIVAnalysis
+from baseball_piv import BaseballPIVAnalysis
 
 
 if __name__=="__main__":
 
-    target_dir = "data/synthetic_jet/"
-    my_piv = TimeSeriesPIVAnalysis(target_dir, "C001H001S00010000", ".tif", 10, 0.01)
-    my_piv.process(32, vector_spacing=8)
-    my_piv.write_to_csv("results/synthetic_jet/velocity")
+    #target_dir = "data/synthetic_jet/"
+    #my_piv = TimeSeriesPIVAnalysis(target_dir, "C001H001S00010000", ".tif", 10, 0.01)
+    #my_piv.process(2.0, 0.5, 32, vector_spacing=8)
+    #my_piv.write_to_csv("results/synthetic_jet/velocity")
+
+    my_piv = BaseballPIVAnalysis("data/baseball_data/baseballs1.tif", 0.001)
+    my_piv.process(2.0, 0.5, 32, vector_spacing=8)
+    my_piv.write_to_csv("results/baseballs/baseballs1_")
