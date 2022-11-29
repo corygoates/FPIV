@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.interpolate as interp
 
 from analysis import get_correlation_peak
 from helpers import OneLineProgress
@@ -49,6 +50,10 @@ class BasePIVAnalysis:
         self.dx = (self.x_lims[1] - self.x_lims[0]) / self.Nx
         self.dy = (self.y_lims[1] - self.y_lims[0]) / self.Ny
 
+        # Get pixel locations
+        self.x_pix = np.linspace(self.x_lims[0]+0.5*self.dx, self.x_lims[1]-0.5*self.dx, self.Nx)
+        self.y_pix = np.linspace(self.y_lims[1]-0.5*self.dy, self.y_lims[0]+0.5*self.dy, self.Ny)
+
         # Determine dimensional vector spacing
         self.vec_spacing_x = self.vector_spacing*self.dx
         self.vec_spacing_y = self.vector_spacing*self.dy
@@ -63,7 +68,7 @@ class BasePIVAnalysis:
 
         # Calculate y locations
         for i in range(self.N_vels_in_y):
-            self.y_vec[i] = -(self.window_size//2 + i*self.vector_spacing)*self.dy
+            self.y_vec[i] = self.y_lims[1] - (self.window_size//2 + i*self.vector_spacing)*self.dy
 
 
     def convert_shifts_to_velocities(self):
@@ -91,12 +96,12 @@ class BasePIVAnalysis:
         """
 
         # Initialize storage
-        self.shifts = np.zeros((self.N, self.N_vels_in_y, self.N_vels_in_x, 2), dtype=int)
+        self.shifts = np.zeros((self.N, self.N_vels_in_y, self.N_vels_in_x, 2))
 
         # Loop through passes
         for i in range(N_passes):
 
-            print("Pass ", i)
+            print("Pass ", i+1)
 
             # Loop through samples
             for l in range(self.N):
@@ -114,8 +119,8 @@ class BasePIVAnalysis:
                         k1 = k0 + self.window_size
 
                         # Get window offset from previous pass
-                        j_shift = self.shifts[l,j,k,0]
-                        k_shift = self.shifts[l,j,k,1]
+                        j_shift = int(round(self.shifts[l,j,k,0]))
+                        k_shift = int(round(self.shifts[l,j,k,1]))
 
                         # Limit shifts to stay inside the data bounds
                         if j0 + j_shift < 0:
@@ -136,7 +141,8 @@ class BasePIVAnalysis:
                         self.shifts[l,j,k,:] = get_correlation_peak(window1, window2)
 
             # Filter
-            self.filter_shifts(e_thresh, e0)
+            if i != 0:
+                self.filter_shifts(e_thresh, e0)
 
 
     def calculate_vorticities(self):
@@ -234,11 +240,21 @@ class BasePIVAnalysis:
 
             # Open file
             with open(filename, 'w') as output_handle:
+                
+                # Get image interpolator
+                interpolator1 = interp.interp2d(self.y_pix, self.x_pix, self.data[i].T)
+                interpolator2 = interp.interp2d(self.y_pix, self.x_pix, self.data[i+1].T)
 
                 # Header
-                print("x,y,z,u,v,zeta", file=output_handle)
+                print("x,y,z,u,v,zeta,raw_data_1,raw_data_2", file=output_handle)
 
                 # Loop through points
                 for j in range(self.N_vels_in_y):
                     for k in range(self.N_vels_in_x):
-                        print("{0},{1},{2},{3},{4},{5}".format(self.x_vec[k], self.y_vec[j], 0.0, self.V[i,j,k,0], self.V[i,j,k,1], self.zeta[i,j,k]), file=output_handle)
+
+                        # Get interpolated image
+                        pix1 = float(interpolator1(self.y_vec[j], self.x_vec[k]).item())
+                        pix2 = float(interpolator2(self.y_vec[j], self.x_vec[k]).item())
+
+                        # Write out to file
+                        print("{0},{1},{2},{3},{4},{5},{6},{7}".format(self.x_vec[k], self.y_vec[j], 0.0, self.V[i,j,k,0], self.V[i,j,k,1], self.zeta[i,j,k], pix1, pix2), file=output_handle)

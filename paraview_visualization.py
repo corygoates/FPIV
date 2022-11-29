@@ -110,41 +110,34 @@ def render_csv_with_paraview(filename):
     renderView1.Update()
 
     # set scalar coloring
-    ColorBy(delaunay2D1Display, ('POINTS', 'zeta'))
+    #ColorBy(delaunay2D1Display, ('POINTS', 'zeta'))
 
-    # rescale color and/or opacity maps used to include current data range
-    delaunay2D1Display.RescaleTransferFunctionToDataRange(True, False)
+    ## rescale color and/or opacity maps used to include current data range
+    #delaunay2D1Display.RescaleTransferFunctionToDataRange(True, False)
 
-    # show color bar/color legend
-    delaunay2D1Display.SetScalarBarVisibility(renderView1, True)
+    ## show color bar/color legend
+    #delaunay2D1Display.SetScalarBarVisibility(renderView1, True)
 
-    # get color transfer function/color map for 'zeta'
-    zetaLUT = GetColorTransferFunction('zeta')
+    ## get color transfer function/color map for 'zeta'
+    #zetaLUT = GetColorTransferFunction('zeta')
 
-    # get opacity transfer function/opacity map for 'zeta'
-    zetaPWF = GetOpacityTransferFunction('zeta')
-
-    # set active source
-    SetActiveSource(tableToPoints1)
+    ## get opacity transfer function/opacity map for 'zeta'
+    #zetaPWF = GetOpacityTransferFunction('zeta')
 
     # set active source
     SetActiveSource(delaunay2D1)
 
     # create a new 'Calculator'
-    calculator1 = Calculator(registrationName='Calculator1', Input=delaunay2D1)
-    calculator1.Function = ''
-
-    # Properties modified on calculator1
+    calculator1 = Calculator(registrationName='Calculator1', Input=delaunay2D1, ResultArrayName='V')
     calculator1.ResultArrayName = 'V'
     calculator1.Function = 'u*iHat + v*jHat'
 
     # show data in view
     calculator1Display = Show(calculator1, renderView1, 'GeometryRepresentation')
+    ColorBy(calculator1Display, ('POINTS', 'raw_data_1'))
 
     # trace defaults for the display properties.
     calculator1Display.Representation = 'Surface'
-    calculator1Display.ColorArrayName = ['POINTS', 'zeta']
-    calculator1Display.LookupTable = zetaLUT
     calculator1Display.SelectTCoordArray = 'None'
     calculator1Display.SelectNormalArray = 'None'
     calculator1Display.SelectTangentArray = 'None'
@@ -162,6 +155,7 @@ def render_csv_with_paraview(filename):
     calculator1Display.OpacityTransferFunction = 'PiecewiseFunction'
     calculator1Display.DataAxesGrid = 'GridAxesRepresentation'
     calculator1Display.PolarAxes = 'PolarAxesRepresentation'
+    calculator1Display.SetScalarBarVisibility(renderView1, False)
 
     # init the 'PiecewiseFunction' selected for 'ScaleTransferFunction'
     calculator1Display.ScaleTransferFunction.Points = [-3.95778364116095, 0.0, 0.5, 0.0, 1.3192612137203161, 1.0, 0.5, 0.0]
@@ -172,9 +166,6 @@ def render_csv_with_paraview(filename):
     # hide data in view
     Hide(delaunay2D1, renderView1)
 
-    # show color bar/color legend
-    calculator1Display.SetScalarBarVisibility(renderView1, True)
-
     # update the view to ensure updated data information
     renderView1.Update()
 
@@ -183,22 +174,23 @@ def render_csv_with_paraview(filename):
     arrow_glyph.OrientationArray = ['POINTS', 'V']
     arrow_glyph.ScaleArray = ['POINTS', 'V']
     arrow_glyph.GlyphTransform = 'Transform2'
-    arrow_glyph.ScaleFactor = 0.001
+    arrow_glyph.ScaleFactor = 0.002
 
     # show data in view
     arrow_glyph_display = Show(arrow_glyph, renderView1, 'GeometryRepresentation')
 
     # trace defaults for the display properties.
     arrow_glyph_display.Representation = 'Surface'
-    arrow_glyph_display.ColorArrayName = ['POINTS', 'zeta']
-    arrow_glyph_display.LookupTable = zetaLUT
+    arrow_glyph_display.ColorArrayName = ['POINTS', 'Solid Color']
+    ColorBy(arrow_glyph_display, None)
+    arrow_glyph_display.AmbientColor = [0.0, 0.0, 0.0]
+    arrow_glyph_display.DiffuseColor = [0.0, 0.0, 0.0]
     arrow_glyph_display.SelectTCoordArray = 'None'
     arrow_glyph_display.SelectNormalArray = 'None'
     arrow_glyph_display.SelectTangentArray = 'None'
     arrow_glyph_display.OSPRayScaleArray = 'V'
     arrow_glyph_display.OSPRayScaleFunction = 'PiecewiseFunction'
     arrow_glyph_display.SelectOrientationVectors = 'V'
-    arrow_glyph_display.ScaleFactor = 0.10325857760035434
     arrow_glyph_display.SelectScaleArray = 'None'
     arrow_glyph_display.GlyphType = 'Arrow'
     arrow_glyph_display.GlyphTableIndexArray = 'None'
@@ -231,15 +223,16 @@ def render_csv_with_paraview(filename):
     # saving layout sizes for layouts
 
     # layout/tab size in pixels
-    layout1.SetSize(1572, 809)
+    layout1.SetSize(800, 800)
 
     #-----------------------------------
     # saving camera placements for views
 
     # current camera placement for renderView1
+    renderView1.OrientationAxesVisibility = 0
     renderView1.InteractionMode = '2D'
-    renderView1.CameraPosition = [0.496042216358839, -0.5, 10000.0]
-    renderView1.CameraFocalPoint = [0.496042216358839, -0.5, 0.0]
+    renderView1.CameraPosition = [0.5, 0.5, 10000.0]
+    renderView1.CameraFocalPoint = [0.5, 0.5, 0.0]
     renderView1.CameraParallelScale = 0.5551279345612684
 
     #--------------------------------------------

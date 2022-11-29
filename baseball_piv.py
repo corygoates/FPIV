@@ -1,14 +1,14 @@
 import numpy as np
 
 from base_piv import BasePIVAnalysis
-from image_handling import get_double_image_from_file
+from image_handling import get_double_image_from_file, display_image_array
 
 
 class BaseballPIVAnalysis(BasePIVAnalysis):
     """A class for PIV analysis on baseballs.
     """
 
-    def __init__(self, filename, dt, x_lims=[0.0, 1.0], y_lims=[0.0, 1.0]):
+    def __init__(self, filename, dt, x_lims=[0.0, 1.0], y_lims=[0.0, 1.0], pixel_threshold=np.inf):
 
         # Get image arrays
         image1, image2 = get_double_image_from_file(filename)
@@ -24,6 +24,9 @@ class BaseballPIVAnalysis(BasePIVAnalysis):
         self.data = np.zeros((2, self.Ny, self.Nx))
         self.data[0] = image1
         self.data[1] = image2
+
+        # Threshold image
+        self.data = np.where(self.data > pixel_threshold, 0.0, self.data)
 
 
     def process(self, e_thresh, e0, window_size, vector_spacing, N_passes=1):
