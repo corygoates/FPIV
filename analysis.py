@@ -3,23 +3,6 @@ import scipy.signal as sig
 
 from image_handling import display_image_array
 
-# Set up matrices for correlation peak fitting
-x = np.array([[-1.0, 0.0, 1.0],
-              [-1.0, 0.0, 1.0],
-              [-1.0, 0.0, 1.0]])
-
-y = np.array([[-1.0, -1.0, -1.0],
-              [ 0.0,  0.0,  0.0],
-              [ 1.0,  1.0,  1.0]])
-
-Z = np.zeros((9,6))
-Z[:,0] = 1.0
-Z[:,1] = x.flatten()
-Z[:,2] = y.flatten()
-Z[:,3] = 0.5*Z[:,1]**2
-Z[:,4] = Z[:,1]*Z[:,2]
-Z[:,5] = 0.5*Z[:,2]**2
-
 
 def get_correlation_peak(array1, array2):
     """Locates the correlation peak between two arrays.
@@ -42,12 +25,13 @@ def get_correlation_peak(array1, array2):
     avg1 = np.average(array1.flatten()).item()
     avg2 = np.average(array2.flatten()).item()
     corr = sig.correlate(array1-avg1, array2-avg2, method='fft', mode='same')
+    corr = np.where(corr < 0.0, 0.0001, corr)
 
-    # Find maximum
+    # Find maximum (we're not going to check the edges here)
     max_corr = 0.0
     i_max = -1
-    for  i in range(corr.shape[0]):
-        for j in range(corr.shape[1]):
+    for  i in range(1, corr.shape[0]-1):
+        for j in range(1, corr.shape[1]-1):
             if corr[i,j] > max_corr:
                 i_max = i
                 j_max = j
@@ -59,14 +43,12 @@ def get_correlation_peak(array1, array2):
     else:
 
         # Get array around peak
-        peak_array = np.zeros((3,3))
-        for i in [-1, 0, 1]:
-            for j in [-1, 0, 1]:
-                if not (i_max+i < 0 or i_max+i >= corr.shape[0] or j_max+j < 0 or j_max+j >= corr.shape[1]):
-                    peak_array[i+1,j+1] = corr[i_max+i,j_max+j]
+        peak_array = corr[i_max-1:i_max+2,j_max-1:j_max+2]
 
         # Get subpixel peak location
         peak = center_of_fit_parabola(peak_array)
+        if any(np.isnan(peak)):
+            display_image_array(corr)
 
         # Reject erroneous peak fits (Shouldn't be further from the original peak than 1 pixel in any direction)
         if np.linalg.norm(peak) > 1.414:
@@ -88,17 +70,15 @@ def center_of_fit_parabola(corr_peak):
         Gives the coordinates of the fit peak. Returns [0,0] if the fit peak is exactly aligned with the original peak.
     """
 
-    # Get parabolic coefficients
-    coefs, _, _, _ = np.linalg.lstsq(Z, corr_peak.flatten(), rcond=None)
+    # y-direction
+    lnR_m = np.log(corr_peak[1,0])
+    lnR_0 = np.log(corr_peak[1,1])
+    lnR_p = np.log(corr_peak[1,2])
+    e_y = 0.5*(lnR_m - lnR_p) / (lnR_m - 2.0*lnR_0 + lnR_p)
 
-    # Get peak location
-    A = np.zeros((2,2))
-    b = np.zeros(2)
-    A[0,0] = coefs[3]
-    A[0,1] = coefs[4]
-    A[1,0] = coefs[4]
-    A[1,1] = coefs[5]
-    b[0] = -coefs[1]
-    b[1] = -coefs[2]
-    peak = np.linalg.solve(A, b)
-    return peak
+    # x-direction
+    lnR_m = np.log(corr_peak[0,1])
+    lnR_p = np.log(corr_peak[2,1])
+    e_x = 0.5*(lnR_m - lnR_p) / (lnR_m - 2.0*lnR_0 + lnR_p)
+
+    return np.nan_to_num([e_y, e_x])

@@ -1,7 +1,7 @@
 from paraview.simple import *
 
 
-def render_csv_with_paraview(filename):
+def render_csv_with_paraview(filename, image_name=None):
     # Renders the data in the given csv file using Paraview
 
     # disable automatic camera reset on 'Show'
@@ -174,7 +174,7 @@ def render_csv_with_paraview(filename):
     arrow_glyph.OrientationArray = ['POINTS', 'V']
     arrow_glyph.ScaleArray = ['POINTS', 'V']
     arrow_glyph.GlyphTransform = 'Transform2'
-    arrow_glyph.ScaleFactor = 0.002
+    arrow_glyph.ScaleFactor = 0.001
 
     # show data in view
     arrow_glyph_display = Show(arrow_glyph, renderView1, 'GeometryRepresentation')
@@ -240,4 +240,5 @@ def render_csv_with_paraview(filename):
     Interact()
     #RenderAllViews()
     # alternatively, if you want to write images, you can use SaveScreenshot(...).
-    SaveScreenshot("image.png")
+    if image_name is not None:
+        SaveScreenshot(image_name)

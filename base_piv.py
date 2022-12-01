@@ -106,6 +106,8 @@ class BasePIVAnalysis:
             # Loop through samples
             for l in range(self.N):
 
+                print("    Calculating image correlations...")
+
                 # Loop through in x direction
                 for j in range(self.N_vels_in_y):
 
@@ -141,14 +143,62 @@ class BasePIVAnalysis:
                         self.shifts[l,j,k,:] = get_correlation_peak(window1, window2)
 
             # Filter
-            if i != 0:
-                self.filter_shifts(e_thresh, e0)
+            self.filter_shifts(e_thresh, e0)
+
+    
+    def filter_shifts(self, e_thresh, e0):
+        """Applies median filtering to the shift array(s).
+
+        Parameters
+        ----------
+        e_thresh : float
+            Normalized threshold for filtering the data.
+
+        e0 : float
+            Normalizer (to avoid division by zero).
+
+        Returns
+        -------
+        ndarray
+            Filtered velocity array.
+        """
+
+        # Initialize new array
+        print("    Applying median filter...")
+        filtered_shifts = np.zeros_like(self.shifts[0])
+
+        # Loop
+        for k in range(self.N):
+            for i in range(self.N_vels_in_y):
+                for j in range(self.N_vels_in_x):
+
+                    # Get neighbors
+                    i_min = max(0, i-1)
+                    i_max = min(self.Ny, i+2)
+                    j_min = max(0, j-1)
+                    j_max = min(self.Nx, j+2)
+
+                    # Get statistics
+                    i_shift_med = np.median(self.shifts[k,i_min:i_max,j_min:j_max,0].flatten()).item()
+                    j_shift_med = np.median(self.shifts[k,i_min:i_max,j_min:j_max,1].flatten()).item()
+                    i_std = np.std(self.shifts[k,i_min:i_max,j_min:j_max,0].flatten(), ddof=1).item()
+                    j_std = np.std(self.shifts[k,i_min:i_max,j_min:j_max,1].flatten(), ddof=1).item()
+
+                    # Check
+                    if abs(self.shifts[k,i,j,0]-i_shift_med)/(i_std+e0) > e_thresh or abs(self.shifts[k,i,j,1]-j_shift_med)/(j_std+e0) > e_thresh:
+                        filtered_shifts[i,j,:] = [i_shift_med, j_shift_med]
+                    else:
+                        filtered_shifts[i,j,:] = self.shifts[k,i,j,:]
+
+            # Replace
+            self.shifts[k] = filtered_shifts
 
 
     def calculate_vorticities(self):
         """Calculates the vorticities from the data."""
 
         # Initialize storage
+        print("    Calculating vorticities...")
         self.zeta = np.zeros((self.N, self.N_vels_in_y, self.N_vels_in_x))
 
         # Loop
@@ -176,53 +226,6 @@ class BasePIVAnalysis:
                     self.zeta[k,i,j] = du_dy - dv_dx
 
     
-    def filter_shifts(self, e_thresh, e0):
-        """Applies median filtering to the shift array(s).
-
-        Parameters
-        ----------
-        e_thresh : float
-            Normalized threshold for filtering the data.
-
-        e0 : float
-            Normalizer (to avoid division by zero).
-
-        Returns
-        -------
-        ndarray
-            Filtered velocity array.
-        """
-
-        # Initialize new array
-        filtered_shifts = np.zeros_like(self.shifts[0])
-
-        # Loop
-        for k in range(self.N):
-            for i in range(self.N_vels_in_y):
-                for j in range(self.N_vels_in_x):
-
-                    # Get neighbors
-                    i_min = max(0, i-1)
-                    i_max = min(self.Ny, i+2)
-                    j_min = max(0, j-1)
-                    j_max = min(self.Nx, j+2)
-
-                    # Get statistics
-                    y_shift_med = np.median(self.shifts[k,i_min:i_max,j_min:j_max,0].flatten()).item()
-                    x_shift_med = np.median(self.shifts[k,i_min:i_max,j_min:j_max,1].flatten()).item()
-                    u_std = np.std(self.shifts[k,i_min:i_max,j_min:j_max,0].flatten(), ddof=1).item()
-                    v_std = np.std(self.shifts[k,i_min:i_max,j_min:j_max,1].flatten(), ddof=1).item()
-
-                    # Check
-                    if abs(self.shifts[k,i,j,0]-y_shift_med)/(u_std*e0) > e_thresh or abs(self.shifts[k,i,j,1]-x_shift_med)/(v_std*e0) > e_thresh:
-                        filtered_shifts[i,j,:] = [y_shift_med, x_shift_med]
-                    else:
-                        filtered_shifts[i,j,:] = self.shifts[k,i,j,:]
-
-            # Replace
-            self.shifts[k] = filtered_shifts
-
-    
     def write_to_csv(self, output_file_root_name):
         """Writes the data to a series of csv files.
         
@@ -233,6 +236,7 @@ class BasePIVAnalysis:
         """
 
         # Loop through data
+        print("    Exporting data...")
         for i in range(self.N):
 
             # Get filename
