@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.interpolate as interp
+import matplotlib.pyplot as plt
 
 from analysis import get_correlation_peak
 from helpers import OneLineProgress
@@ -80,7 +81,7 @@ class BasePIVAnalysis:
         self.V[:,:,:,1] =  self.shifts[:,:,:,0]*self.dy/self.dt
 
 
-    def calculate_shifts(self, e_thresh, e0, N_passes=0):
+    def calculate_shifts(self, e_thresh, e0, N_passes=0, max_shift_in_pixels=None):
         """Calculates the shift fields between the raw data.
         
         Parameters
@@ -93,6 +94,9 @@ class BasePIVAnalysis:
 
         N_passes : int, optional
             Number of passes using window offsetting. Defaults to 1.
+        
+        max_shift_in_pixels : int, optional
+            Displacement threshold for throwing out vectors which are too large. Defaults to keeping all vectors.
         """
 
         # Initialize storage
@@ -141,6 +145,12 @@ class BasePIVAnalysis:
 
                         # Cross-correlate
                         self.shifts[l,j,k,:] = get_correlation_peak(window1, window2)
+
+                # Throw out bad vectors
+                if max_shift_in_pixels is not None:
+                    self.shifts[l,:,:,:] = np.where((np.linalg.norm(self.shifts[l,:,:,:], axis=2, keepdims=True) > max_shift_in_pixels),
+                                                    0.0,
+                                                    self.shifts[l,:,:,:])
 
             # Filter
             self.filter_shifts(e_thresh, e0)
@@ -202,28 +212,15 @@ class BasePIVAnalysis:
         self.zeta = np.zeros((self.N, self.N_vels_in_y, self.N_vels_in_x))
 
         # Loop
+        Dx = self.vector_spacing*self.dx*0.5
+        Dy = self.vector_spacing*self.dy*0.5
         for k in range(self.N):
-            for i in range(self.N_vels_in_y):
-                for j in range(self.N_vels_in_x):
-
-                    # Get dv/dx
-                    if j == 0:
-                        dv_dx = (self.V[k,i,j+1,1] - self.V[k,i,j,1])/self.vec_spacing_x
-                    elif j == self.N_vels_in_x-1:
-                        dv_dx = (self.V[k,i,j,1] - self.V[k,i,j-1,1])/self.vec_spacing_x
-                    else:
-                        dv_dx = 0.5*(self.V[k,i,j+1,1] - self.V[k,i,j-1,1])/self.vec_spacing_x
-
-                    # Get du/dy
-                    if i == 0:
-                        du_dy = (self.V[k,i,j,0] - self.V[k,i+1,j,0])/self.vec_spacing_y
-                    elif i == self.N_vels_in_y-1:
-                        du_dy = (self.V[k,i-1,j,0] - self.V[k,i,j,0])/self.vec_spacing_y
-                    else:
-                        du_dy = 0.5*(self.V[k,i-1,j,0] - self.V[k,i+1,j,0])/self.vec_spacing_y
-
-                    # Calculate vorticity
-                    self.zeta[k,i,j] = du_dy - dv_dx
+            for i in range(1,self.N_vels_in_y-1):
+                for j in range(1,self.N_vels_in_x-1):
+                    self.zeta[k,i,j]  = Dx*(self.V[k,i+1,j-1,0] + 2.0*self.V[k,i+1,j,0] + self.V[k,i+1,j+1,0])
+                    self.zeta[k,i,j] += Dy*(self.V[k,i+1,j+1,1] + 2.0*self.V[k,i,j+1,1] + self.V[k,i-1,j+1,1])
+                    self.zeta[k,i,j] -= Dx*(self.V[k,i-1,j-1,0] + 2.0*self.V[k,i-1,j,0] + self.V[k,i-1,j+1,0])
+                    self.zeta[k,i,j] -= Dy*(self.V[k,i+1,j-1,1] + 2.0*self.V[k,i,j-1,1] + self.V[k,i-1,j-1,1])
 
     
     def write_to_csv(self, output_file_root_name):
@@ -262,3 +259,29 @@ class BasePIVAnalysis:
 
                         # Write out to file
                         print("{0},{1},{2},{3},{4},{5},{6},{7}".format(self.x_vec[k], self.y_vec[j], 0.0, self.V[i,j,k,0], self.V[i,j,k,1], self.zeta[i,j,k], pix1, pix2), file=output_handle)
+
+
+    def create_velocity_histogram(self, frame_indices=[0], filename=None):
+        """Plots a histogram of the u and v velocities.
+        
+        Parameters
+        ----------
+        frame_indices : list, optional
+            List of frame indices to show the histogram for. Defaults to [0].
+
+        filename : str, optional
+            Filename to write the histogram to. Defaults to no file, and the graph is displayed to the user instead.
+            Must be ".png".
+        """
+
+        # Loop through desired frames
+        print("    Plotting histograms...")
+        for i in frame_indices:
+
+            # Plot
+            plt.figure()
+            plt.hist(self.V[i,:,:,0].flatten(), bins=50, label='$u$', histtype='bar', color='b')
+            plt.hist(self.V[i,:,:,1].flatten(), bins=50, label='$v$', histtype='step', color='r', linewidth=2)
+            plt.yscale('log')
+            plt.legend()
+            plt.show()
