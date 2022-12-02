@@ -10,7 +10,7 @@ class BaseballPIVAnalysis(BasePIVAnalysis):
     """A class for PIV analysis on baseballs.
     """
 
-    def __init__(self, filename, dt, x_lims=None, y_lims=None, pixel_threshold=np.inf):
+    def __init__(self, filename, dt, x_lims=None, y_lims=None, pixel_threshold=np.inf, remove_baseball=True):
 
         # Get image arrays
         image1, image2 = get_double_image_from_file(filename)
@@ -30,14 +30,28 @@ class BaseballPIVAnalysis(BasePIVAnalysis):
         self.data[0] = image1
         self.data[1] = image2
 
-        # Threshold image
-        #self.data = np.where(self.data > pixel_threshold, 0.0, self.data)
-
         # Remove baseball
-        cv2.imwrite("temp.png", self.data[0])
-        img = cv2.imread("temp.png", flags=0)
-        circles = cv2.HoughCircles(img, cv2.HOUGH_GRADIENT, 1.3, 100)
-        print(circles)
+        if remove_baseball:
+
+            # Load images
+            cv2.imwrite("temp.png", self.data[0])
+            img1 = cv2.imread("temp.png", flags=0)
+            baseball1 = cv2.HoughCircles(img1, cv2.HOUGH_GRADIENT, 1.3, 100).flatten()
+            cv2.imwrite("temp.png", self.data[1])
+            img2 = cv2.imread("temp.png", flags=0)
+            baseball2 = cv2.HoughCircles(img2, cv2.HOUGH_GRADIENT, 1.3, 100).flatten()
+            os.remove("temp.png")
+
+            # Get rid of pixels within baseball
+            for i in range(self.Ny):
+                for j in range(self.Nx):
+                    if (i-baseball1[1])**2 + (j-baseball1[0])**2 < baseball1[2]**2:
+                        self.data[0,i,j] = 0.0
+                    if (i-baseball2[1])**2 + (j-baseball2[0])**2 < baseball2[2]**2:
+                        self.data[1,i,j] = 0.0
+
+        # Threshold image
+        self.data = np.where(self.data > pixel_threshold, 0.0, self.data)
 
 
     def process(self, e_thresh, e0, window_size, vector_spacing, N_passes=1, max_shift_in_pixels=None):
