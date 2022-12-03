@@ -285,3 +285,52 @@ class BasePIVAnalysis:
             plt.yscale('log')
             plt.legend()
             plt.show()
+
+
+    def plot_slice_in_y(self, frame_index, x_index):
+        """Plots the data at the given frame and x location.
+
+        Parameters
+        ----------
+        frame_index : int
+            Data frame to plot a slice from.
+
+        x_index : int
+            x location at which to slice the data.
+        """
+
+        # Plot
+        plt.figure()
+        plt.plot(self.V[frame_index,:,x_index,0], self.y_vec, 'b', label='$u$')
+        plt.plot(self.V[frame_index,:,x_index,1], self.y_vec, 'r', label='$v$')
+        plt.xlabel('Velocity')
+        plt.ylabel('$y$')
+        plt.legend()
+        plt.show()
+
+
+    def plot_quiver(self, frame_index):
+        """Plots the velocities at the given frame.
+
+        Parameters
+        ----------
+        frame_index : int
+            Data frame to plot from.
+        """
+
+        # Get velocity magnitudes
+        V_mag = np.linalg.norm(self.V[frame_index], axis=-1)
+
+        # Convert to RGB values
+        V_mag = V_mag.flatten()/np.max(V_mag.flatten()).item()
+        colors = np.repeat(V_mag[:,np.newaxis], 3, axis=1)
+        colors[:,1] = 0.5-0.5*np.cos(colors[:,1]*np.pi)
+        colors[:,2] = 1.0-colors[:,2]
+
+        # Plot
+        plt.figure()
+        plt.quiver(self.x_vec, self.y_vec, self.V[frame_index,:,:,0], self.V[frame_index,:,:,1], color=colors, width=0.001)
+        plt.gca().axis('equal')
+        plt.xlabel('x')
+        plt.ylabel('y')
+        plt.show()

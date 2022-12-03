@@ -23,10 +23,11 @@ def render_csv_with_paraview(filename, **kwargs):
     data_from_csv = CSVReader(registrationName=filename.split('.')[0], FileName=[filename])
 
     # Apply table to points filter
-    tableToPoints1 = TableToPoints(registrationName='TableToPoints1', Input=data_from_csv)
-    tableToPoints1.XColumn = 'x'
-    tableToPoints1.YColumn = 'y'
-    tableToPoints1.ZColumn = 'z'
+    tableToPoints1 = TableToPoints(registrationName='TableToPoints1',
+                                   Input=data_from_csv,
+                                   XColumn='x',
+                                   YColumn='y',
+                                   ZColumn='z')
 
     # show data in view
     renderView1 = FindViewOrCreate('RenderView1', viewtype='RenderView')
@@ -41,27 +42,6 @@ def render_csv_with_paraview(filename, **kwargs):
     # show data in view
     delaunay2D1Display = Show(delaunay2D1, renderView1, 'GeometryRepresentation')
 
-    # trace defaults for the display properties.
-    delaunay2D1Display.Representation = 'Surface'
-    delaunay2D1Display.ColorArrayName = [None, '']
-    delaunay2D1Display.SelectTCoordArray = 'None'
-    delaunay2D1Display.SelectNormalArray = 'None'
-    delaunay2D1Display.SelectTangentArray = 'None'
-    delaunay2D1Display.OSPRayScaleArray = 'u'
-    delaunay2D1Display.OSPRayScaleFunction = 'PiecewiseFunction'
-    delaunay2D1Display.SelectOrientationVectors = 'None'
-    delaunay2D1Display.ScaleFactor = 0.09500000000000001
-    delaunay2D1Display.SelectScaleArray = 'None'
-    delaunay2D1Display.GlyphType = 'Arrow'
-    delaunay2D1Display.GlyphTableIndexArray = 'None'
-    delaunay2D1Display.GaussianRadius = 0.004750000000000001
-    delaunay2D1Display.SetScaleArray = ['POINTS', 'u']
-    delaunay2D1Display.ScaleTransferFunction = 'PiecewiseFunction'
-    delaunay2D1Display.OpacityArray = ['POINTS', 'u']
-    delaunay2D1Display.OpacityTransferFunction = 'PiecewiseFunction'
-    delaunay2D1Display.DataAxesGrid = 'GridAxesRepresentation'
-    delaunay2D1Display.PolarAxes = 'PolarAxesRepresentation'
-
     # init the 'PiecewiseFunction' selected for 'ScaleTransferFunction'
     delaunay2D1Display.ScaleTransferFunction.Points = [-3.95778364116095, 0.0, 0.5, 0.0, 1.3192612137203161, 1.0, 0.5, 0.0]
 
@@ -75,34 +55,11 @@ def render_csv_with_paraview(filename, **kwargs):
     SetActiveSource(delaunay2D1)
 
     # create a new 'Calculator'
-    calculator1 = Calculator(registrationName='Calculator1', Input=delaunay2D1, ResultArrayName='V')
-    calculator1.ResultArrayName = 'V'
-    calculator1.Function = 'u*iHat + v*jHat'
+    calculator1 = Calculator(registrationName='Calculator1', Input=delaunay2D1, ResultArrayName='V', Function="u*iHat + v*jHat")
 
     # show data in view
     calculator1Display = Show(calculator1, renderView1, 'GeometryRepresentation')
     ColorBy(calculator1Display, ('POINTS', 'raw_data_1'))
-
-    # trace defaults for the display properties.
-    calculator1Display.Representation = 'Surface'
-    calculator1Display.SelectTCoordArray = 'None'
-    calculator1Display.SelectNormalArray = 'None'
-    calculator1Display.SelectTangentArray = 'None'
-    calculator1Display.OSPRayScaleArray = 'V'
-    calculator1Display.OSPRayScaleFunction = 'PiecewiseFunction'
-    calculator1Display.SelectOrientationVectors = 'V'
-    calculator1Display.ScaleFactor = 0.09500000000000001
-    calculator1Display.SelectScaleArray = 'None'
-    calculator1Display.GlyphType = 'Arrow'
-    calculator1Display.GlyphTableIndexArray = 'None'
-    calculator1Display.GaussianRadius = 0.004750000000000001
-    calculator1Display.SetScaleArray = ['POINTS', 'V']
-    calculator1Display.ScaleTransferFunction = 'PiecewiseFunction'
-    calculator1Display.OpacityArray = ['POINTS', 'V']
-    calculator1Display.OpacityTransferFunction = 'PiecewiseFunction'
-    calculator1Display.DataAxesGrid = 'GridAxesRepresentation'
-    calculator1Display.PolarAxes = 'PolarAxesRepresentation'
-    calculator1Display.SetScalarBarVisibility(renderView1, False)
 
     # init the 'PiecewiseFunction' selected for 'ScaleTransferFunction'
     calculator1Display.ScaleTransferFunction.Points = [-3.95778364116095, 0.0, 0.5, 0.0, 1.3192612137203161, 1.0, 0.5, 0.0]
@@ -117,11 +74,13 @@ def render_csv_with_paraview(filename, **kwargs):
     renderView1.Update()
 
     # Create arrow glyphs
-    arrow_glyph = Glyph(registrationName='V arrows', Input=calculator1, GlyphType='2D Glyph')
-    arrow_glyph.OrientationArray = ['POINTS', 'V']
-    arrow_glyph.ScaleArray = ['POINTS', 'V']
-    arrow_glyph.GlyphTransform = 'Transform2'
-    arrow_glyph.ScaleFactor = kwargs.get("arrow_scale_factor", 0.001)
+    arrow_glyph = Glyph(registrationName='V arrows',
+                        Input=calculator1,
+                        GlyphType='2D Glyph',
+                        ScaleFactor=kwargs.get("arrow_scale_factor", 0.001),
+                        OrientationArray = ['POINTS', 'V'],
+                        ScaleArray = ['POINTS', 'V'],
+                        GlyphTransform = 'Transform2')
 
     # show data in view
     arrow_glyph_display = Show(arrow_glyph, renderView1, 'GeometryRepresentation')
