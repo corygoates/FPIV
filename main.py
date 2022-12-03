@@ -17,4 +17,4 @@ if __name__=="__main__":
     my_piv.write_to_csv("results/baseballs/baseballs1_")
     my_piv.create_velocity_histogram()
 
-    render_csv_with_paraview("results/baseballs/baseballs1_0.csv", image_name='baseball.png')
+    render_csv_with_paraview("results/baseballs/baseballs1_0.csv", image_name='baseball.png', arrow_scale_factor=0.003)

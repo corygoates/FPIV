@@ -37,7 +37,6 @@ class BaseballPIVAnalysis(BasePIVAnalysis):
         cv2.imwrite("temp.png", self.data[0])
         img = cv2.imread("temp.png", flags=0)
         circles = cv2.HoughCircles(img, cv2.HOUGH_GRADIENT, 1.3, 100)
-        print(circles)
 
 
     def process(self, e_thresh, e0, window_size, vector_spacing, N_passes=1, max_shift_in_pixels=None):

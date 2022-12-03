@@ -1,71 +1,36 @@
 from paraview.simple import *
 
 
-def render_csv_with_paraview(filename, image_name=None):
-    # Renders the data in the given csv file using Paraview
+def render_csv_with_paraview(filename, **kwargs):
+    """Renders the given CSV data using paraview.
+    
+    Parameters
+    ----------
+    filename : str
+        CSV file to read in the data from.
+
+    image_file : str, optional
+        File to write the rendered data to. Defaults to no output.
+
+    arrow_scale_factor : float, optional
+        Velocity vector length scaling. Defaults to 0.001.
+    """
 
     # disable automatic camera reset on 'Show'
     paraview.simple._DisableFirstRenderCameraReset()
 
-    # create a new 'CSV Reader'
+    # Read in data from CSV
     data_from_csv = CSVReader(registrationName=filename.split('.')[0], FileName=[filename])
 
-    # create a new 'Table To Points'
+    # Apply table to points filter
     tableToPoints1 = TableToPoints(registrationName='TableToPoints1', Input=data_from_csv)
-    tableToPoints1.XColumn = 'u'
-    tableToPoints1.YColumn = 'u'
-    tableToPoints1.ZColumn = 'u'
-
-    # Properties modified on tableToPoints1
     tableToPoints1.XColumn = 'x'
     tableToPoints1.YColumn = 'y'
     tableToPoints1.ZColumn = 'z'
 
     # show data in view
     renderView1 = FindViewOrCreate('RenderView1', viewtype='RenderView')
-    tableToPoints1Display = Show(tableToPoints1, renderView1, 'GeometryRepresentation')
     layout1 = GetLayoutByName('Layout #1')
-
-    # trace defaults for the display properties.
-    tableToPoints1Display.Representation = 'Surface'
-    tableToPoints1Display.ColorArrayName = [None, '']
-    tableToPoints1Display.SelectTCoordArray = 'None'
-    tableToPoints1Display.SelectNormalArray = 'None'
-    tableToPoints1Display.SelectTangentArray = 'None'
-    tableToPoints1Display.OSPRayScaleArray = 'u'
-    tableToPoints1Display.OSPRayScaleFunction = 'PiecewiseFunction'
-    tableToPoints1Display.SelectOrientationVectors = 'None'
-    tableToPoints1Display.ScaleFactor = 0.09500000000000001
-    tableToPoints1Display.SelectScaleArray = 'None'
-    tableToPoints1Display.GlyphType = 'Arrow'
-    tableToPoints1Display.GlyphTableIndexArray = 'None'
-    tableToPoints1Display.GaussianRadius = 0.004750000000000001
-    tableToPoints1Display.SetScaleArray = ['POINTS', 'u']
-    tableToPoints1Display.ScaleTransferFunction = 'PiecewiseFunction'
-    tableToPoints1Display.OpacityArray = ['POINTS', 'u']
-    tableToPoints1Display.OpacityTransferFunction = 'PiecewiseFunction'
-    tableToPoints1Display.DataAxesGrid = 'GridAxesRepresentation'
-    tableToPoints1Display.PolarAxes = 'PolarAxesRepresentation'
-
-    # init the 'PiecewiseFunction' selected for 'ScaleTransferFunction'
-    tableToPoints1Display.ScaleTransferFunction.Points = [-3.95778364116095, 0.0, 0.5, 0.0, 1.3192612137203161, 1.0, 0.5, 0.0]
-
-    # init the 'PiecewiseFunction' selected for 'OpacityTransferFunction'
-    tableToPoints1Display.OpacityTransferFunction.Points = [-3.95778364116095, 0.0, 0.5, 0.0, 1.3192612137203161, 1.0, 0.5, 0.0]
-
-    # reset view to fit data
-    renderView1.ResetCamera(True)
-
-    #changing interaction mode based on data extents
-    renderView1.InteractionMode = '2D'
-    renderView1.CameraPosition = [0.496042216358839, -0.5, 10000.0]
-    renderView1.CameraFocalPoint = [0.496042216358839, -0.5, 0.0]
-
-    # get the material library
-    materialLibrary1 = GetMaterialLibrary()
-
-    # update the view to ensure updated data information
-    renderView1.Update()
 
     # create a new 'Delaunay 2D'
     delaunay2D1 = Delaunay2D(registrationName='Delaunay2D1', Input=tableToPoints1)
@@ -103,26 +68,8 @@ def render_csv_with_paraview(filename, image_name=None):
     # init the 'PiecewiseFunction' selected for 'OpacityTransferFunction'
     delaunay2D1Display.OpacityTransferFunction.Points = [-3.95778364116095, 0.0, 0.5, 0.0, 1.3192612137203161, 1.0, 0.5, 0.0]
 
-    # hide data in view
-    Hide(tableToPoints1, renderView1)
-
     # update the view to ensure updated data information
     renderView1.Update()
-
-    # set scalar coloring
-    #ColorBy(delaunay2D1Display, ('POINTS', 'zeta'))
-
-    ## rescale color and/or opacity maps used to include current data range
-    #delaunay2D1Display.RescaleTransferFunctionToDataRange(True, False)
-
-    ## show color bar/color legend
-    #delaunay2D1Display.SetScalarBarVisibility(renderView1, True)
-
-    ## get color transfer function/color map for 'zeta'
-    #zetaLUT = GetColorTransferFunction('zeta')
-
-    ## get opacity transfer function/opacity map for 'zeta'
-    #zetaPWF = GetOpacityTransferFunction('zeta')
 
     # set active source
     SetActiveSource(delaunay2D1)
@@ -174,7 +121,7 @@ def render_csv_with_paraview(filename, image_name=None):
     arrow_glyph.OrientationArray = ['POINTS', 'V']
     arrow_glyph.ScaleArray = ['POINTS', 'V']
     arrow_glyph.GlyphTransform = 'Transform2'
-    arrow_glyph.ScaleFactor = 0.001
+    arrow_glyph.ScaleFactor = kwargs.get("arrow_scale_factor", 0.001)
 
     # show data in view
     arrow_glyph_display = Show(arrow_glyph, renderView1, 'GeometryRepresentation')
@@ -214,14 +161,6 @@ def render_csv_with_paraview(filename, image_name=None):
     # update the view to ensure updated data information
     renderView1.Update()
 
-    #================================================================
-    # addendum: following script captures some of the application
-    # state to faithfully reproduce the visualization during playback
-    #================================================================
-
-    #--------------------------------
-    # saving layout sizes for layouts
-
     # layout/tab size in pixels
     layout1.SetSize(800, 800)
 
@@ -235,10 +174,10 @@ def render_csv_with_paraview(filename, image_name=None):
     renderView1.CameraFocalPoint = [0.5, 0.5, 0.0]
     renderView1.CameraParallelScale = 0.5551279345612684
 
-    #--------------------------------------------
-    # uncomment the following to render all views
+    # Render and allow interaction
     Interact()
-    #RenderAllViews()
-    # alternatively, if you want to write images, you can use SaveScreenshot(...).
+
+    # Save image
+    image_name = kwargs.get("image_name")
     if image_name is not None:
         SaveScreenshot(image_name)
