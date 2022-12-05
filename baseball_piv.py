@@ -1,5 +1,6 @@
 import cv2
 import os
+import math as m
 import numpy as np
 
 from base_piv import BasePIVAnalysis
@@ -10,31 +11,38 @@ class BaseballPIVAnalysis(BasePIVAnalysis):
     """A class for PIV analysis on baseballs.
     """
 
-    def __init__(self, filename, dt, pixel_threshold=np.inf, remove_baseball=True, D_baseball=2.9/12.0):
+    def __init__(self, filename, dt, pixel_threshold=np.inf, remove_baseball=True, D_baseball=2.9/12.0, scale_vals=0.01):
 
         # Get image arrays
         image1, image2 = get_double_image_from_file(filename)
         self.Ny, self.Nx = image1.shape
         self.N = 1
+        print("Got {0} x {1} image.".format(self.Nx, self.Ny))
 
         # Store other params
         self.dt = dt
 
         # Initialize array
         self.data = np.zeros((2, self.Ny, self.Nx))
-        self.data[0] = image1
-        self.data[1] = image2
+        self.data[0] = image1*scale_vals
+        self.data[1] = image2*scale_vals
+        self.data = np.where(self.data > 50, 50, self.data)
 
         print("Detecting baseball...")
 
         # Load images
         cv2.imwrite("temp.png", self.data[0])
         img1 = cv2.imread("temp.png", flags=0)
-        baseball1 = cv2.HoughCircles(img1, cv2.HOUGH_GRADIENT, 1.3, 100).flatten()
         cv2.imwrite("temp.png", self.data[1])
         img2 = cv2.imread("temp.png", flags=0)
-        baseball2 = cv2.HoughCircles(img2, cv2.HOUGH_GRADIENT, 1.3, 100).flatten()
         os.remove("temp.png")
+
+        # Locate circles
+        image_dim = min(self.Nx, self.Ny)
+        baseball1 = cv2.HoughCircles(img1, cv2.HOUGH_GRADIENT, 1.3, 100, param2=60, minRadius=image_dim//4, maxRadius=image_dim)
+        baseball2 = cv2.HoughCircles(img2, cv2.HOUGH_GRADIENT, 1.3, 100, param2=60, minRadius=image_dim//4, maxRadius=image_dim)
+        baseball1 = baseball1.flatten()
+        baseball2 = baseball2.flatten()
         self.R_baseball = 0.5*(baseball1[2] + baseball2[2])
 
         # Scale image to match baseball diameter and make pixels square
@@ -47,15 +55,17 @@ class BaseballPIVAnalysis(BasePIVAnalysis):
             print("Removing baseballs from images...")
 
             # Get rid of pixels within baseball
-            for i in range(self.Ny):
-                for j in range(self.Nx):
-                    if (i-baseball1[1])**2 + (j-baseball1[0])**2 < baseball1[2]**2:
-                        self.data[0,i,j] = 0.0
-                    if (i-baseball2[1])**2 + (j-baseball2[0])**2 < baseball2[2]**2:
-                        self.data[1,i,j] = 0.0
+            indices = np.indices((self.Ny, self.Nx))
+            within_ball_1 = np.ceil((indices[0]-baseball1[1])**2) + np.ceil((indices[1]-baseball1[0])**2) < baseball1[2]**2
+            within_ball_2 = np.ceil((indices[0]-baseball2[1])**2) + np.ceil((indices[1]-baseball2[0])**2) < baseball2[2]**2
+            self.data[0] = np.where(within_ball_1, 0.0, self.data[0])
+            self.data[1] = np.where(within_ball_2, 0.0, self.data[1])
 
         # Threshold image
         self.data = np.where(self.data > pixel_threshold, 0.0, self.data)
+        display_image_array(self.data[0])
+        display_image_array(self.data[1])
+
 
 
     def process(self, e_thresh, e0, window_size, vector_spacing, N_passes=1, max_shift_in_pixels=None):
