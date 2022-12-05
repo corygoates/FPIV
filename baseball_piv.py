@@ -11,7 +11,7 @@ class BaseballPIVAnalysis(BasePIVAnalysis):
     """A class for PIV analysis on baseballs.
     """
 
-    def __init__(self, filename, dt, pixel_threshold=np.inf, remove_baseball=True, D_baseball=2.9/12.0, scale_vals=0.01):
+    def __init__(self, filename, dt=None, pixel_threshold=np.inf, remove_baseball=True, D_baseball=2.9/12.0, scale_vals=0.01):
 
         # Get image arrays
         image1, image2 = get_double_image_from_file(filename)
@@ -63,9 +63,6 @@ class BaseballPIVAnalysis(BasePIVAnalysis):
 
         # Threshold image
         self.data = np.where(self.data > pixel_threshold, 0.0, self.data)
-        display_image_array(self.data[0])
-        display_image_array(self.data[1])
-
 
 
     def process(self, e_thresh, e0, window_size, vector_spacing, N_passes=1, max_shift_in_pixels=None):

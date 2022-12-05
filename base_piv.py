@@ -106,11 +106,10 @@ class BasePIVAnalysis:
         for i in range(N_passes):
 
             print("Pass ", i+1)
+            prog = OneLineProgress(self.N*self.N_vels_in_y, "    Calculating image cross-correlations")
 
             # Loop through samples
             for l in range(self.N):
-
-                print("    Calculating image correlations...")
 
                 # Loop through in x direction
                 for j in range(self.N_vels_in_y):
@@ -146,6 +145,8 @@ class BasePIVAnalysis:
                         # Cross-correlate
                         self.shifts[l,j,k,:] = get_correlation_peak(window1, window2)
 
+                    prog.display()
+
                 # Throw out bad vectors
                 if max_shift_in_pixels is not None:
                     self.shifts[l,:,:,:] = np.where((np.linalg.norm(self.shifts[l,:,:,:], axis=2, keepdims=True) > max_shift_in_pixels),
@@ -174,7 +175,7 @@ class BasePIVAnalysis:
         """
 
         # Initialize new array
-        print("    Applying median filter...")
+        prog = OneLineProgress(self.N*self.N_vels_in_y, "    Applying median filter")
         filtered_shifts = np.zeros_like(self.shifts[0])
 
         # Loop
@@ -200,6 +201,8 @@ class BasePIVAnalysis:
                     else:
                         filtered_shifts[i,j,:] = self.shifts[k,i,j,:]
 
+                prog.display()
+
             # Replace
             self.shifts[k] = filtered_shifts
 
@@ -208,7 +211,7 @@ class BasePIVAnalysis:
         """Calculates the vorticities from the data."""
 
         # Initialize storage
-        print("    Calculating vorticities...")
+        print("Calculating vorticities...")
         self.zeta = np.zeros((self.N, self.N_vels_in_y, self.N_vels_in_x))
 
         # Loop
@@ -233,7 +236,7 @@ class BasePIVAnalysis:
         """
 
         # Loop through data
-        print("    Exporting data...")
+        print("Exporting data...")
         for i in range(self.N):
 
             # Get filename
@@ -275,7 +278,7 @@ class BasePIVAnalysis:
         """
 
         # Loop through desired frames
-        print("    Plotting histograms...")
+        print("Plotting histograms...")
         for i in frame_indices:
 
             # Plot
@@ -309,27 +312,41 @@ class BasePIVAnalysis:
         plt.show()
 
 
-    def plot_quiver(self, frame_index):
+    def plot_quiver(self, frame_index, plot_vortiticy=True, color_arrows=False):
         """Plots the velocities at the given frame.
 
         Parameters
         ----------
         frame_index : int
             Data frame to plot from.
+
+        plot_vorticity : bool, optional
+            Whether to include the vorticity in the background. Defaults to True.
+
+        color_arrows : bool, optional
+            Whether to set the color of the vectors based on magnitude. Defaults to False.
         """
 
         # Get velocity magnitudes
-        V_mag = np.linalg.norm(self.V[frame_index], axis=-1)
+        if color_arrows:
+            V_mag = np.linalg.norm(self.V[frame_index], axis=-1)
 
-        # Convert to RGB values
-        V_mag = V_mag.flatten()/np.max(V_mag.flatten()).item()
-        colors = np.repeat(V_mag[:,np.newaxis], 3, axis=1)
-        colors[:,1] = 0.5-0.5*np.cos(colors[:,1]*np.pi)
-        colors[:,2] = 1.0-colors[:,2]
+            # Convert to RGB values
+            V_mag = V_mag.flatten()/np.max(V_mag.flatten()).item()
+            colors = np.repeat(V_mag[:,np.newaxis], 3, axis=1)
+            colors[:,2] = 1.0-colors[:,2]
+            colors[:,1] = 0.0
 
         # Plot
         plt.figure()
-        plt.quiver(self.x_vec, self.y_vec, self.V[frame_index,:,:,0], self.V[frame_index,:,:,1], color=colors, width=0.001)
+        if plot_vortiticy:
+            plt.contourf(self.x_vec, self.y_vec, self.zeta[frame_index], levels=20, cmap='bwr')
+            plt.quiver(self.x_vec, self.y_vec, self.V[frame_index,:,:,0], self.V[frame_index,:,:,1], width=0.001)
+        else:
+            if color_arrows:
+                plt.quiver(self.x_vec, self.y_vec, self.V[frame_index,:,:,0], self.V[frame_index,:,:,1], color=colors, width=0.001)
+            else:
+                plt.quiver(self.x_vec, self.y_vec, self.V[frame_index,:,:,0], self.V[frame_index,:,:,1], width=0.001)
         plt.gca().axis('equal')
         plt.xlabel('x')
         plt.ylabel('y')
