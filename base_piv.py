@@ -192,8 +192,8 @@ class BasePIVAnalysis:
                     j_shifts = np.array(j_shifts)
 
                     # Get median values
-                    i_med = np.median(i_shifts[1:-1]).item()
-                    j_med = np.median(j_shifts[1:-1]).item()
+                    i_med = np.median(i_shifts).item()
+                    j_med = np.median(j_shifts).item()
 
                     # Get sorted shifts
                     i_sort_ind = np.argsort(abs(i_shifts-i_med))
