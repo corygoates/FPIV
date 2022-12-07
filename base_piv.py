@@ -181,27 +181,29 @@ class BasePIVAnalysis:
                 for j in range(self.N_vels_in_x):
 
                     # Get neighbors
-                    i_min = max(0, i-1)
-                    i_max = min(self.N_vels_in_y, i+2)
-                    j_min = max(0, j-1)
-                    j_max = min(self.N_vels_in_x, j+2)
                     i_shifts = []
                     j_shifts = []
-                    for ii in range(i_min, i_max):
-                        for jj in range(j_min, j_max):
-                            if ii != 1 or jj != 1:
+                    for ii in range(max(0, i-1), min(self.N_vels_in_y, i+2)):
+                        for jj in range(max(0, j-1), min(self.N_vels_in_x, j+2)):
+                            if ii != i or jj != j:
                                 i_shifts.append(self.shifts[k,ii,jj,0])
                                 j_shifts.append(self.shifts[k,ii,jj,1])
+                    i_shifts = np.array(i_shifts)
+                    j_shifts = np.array(j_shifts)
 
-                    # Get sorted shifts
-                    i_shifts = np.sort(i_shifts)
-                    j_shifts = np.sort(j_shifts)
-
-                    # Get statistics
+                    # Get median values
                     i_med = np.median(i_shifts[1:-1]).item()
                     j_med = np.median(j_shifts[1:-1]).item()
-                    i_std = np.std(i_shifts[1:-1]).item()
-                    j_std = np.std(j_shifts[1:-1]).item()
+
+                    # Get sorted shifts
+                    i_sort_ind = np.argsort(abs(i_shifts-i_med))
+                    j_sort_ind = np.argsort(abs(j_shifts-j_med))
+                    i_shifts = i_shifts[i_sort_ind]
+                    j_shifts = j_shifts[j_sort_ind]
+
+                    # Get standard deviation ignoring the two points furthest away
+                    i_std = np.std(i_shifts[:-2]).item()
+                    j_std = np.std(j_shifts[:-2]).item()
 
                     # Check
                     if abs(self.shifts[k,i,j,0]-i_med)/(i_std+e0) > e_thresh or abs(self.shifts[k,i,j,1]-j_med)/(j_std+e0) > e_thresh:
