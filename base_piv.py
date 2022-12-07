@@ -144,6 +144,8 @@ class BasePIVAnalysis:
 
                         # Cross-correlate
                         self.shifts[l,j,k,:] = get_correlation_peak(window1, window2)
+                        self.shifts[l,j,k,0] += j_shift
+                        self.shifts[l,j,k,1] += k_shift
 
                     prog.display()
 
@@ -154,10 +156,10 @@ class BasePIVAnalysis:
                                                     self.shifts[l,:,:,:])
 
             # Filter
-            self.filter_shifts(e_thresh, e0)
+            self.apply_median_filter(e_thresh, e0)
 
     
-    def filter_shifts(self, e_thresh, e0):
+    def apply_median_filter(self, e_thresh, e0):
         """Applies median filtering to the shift array(s).
 
         Parameters
@@ -167,11 +169,6 @@ class BasePIVAnalysis:
 
         e0 : float
             Normalizer (to avoid division by zero).
-
-        Returns
-        -------
-        ndarray
-            Filtered velocity array.
         """
 
         # Initialize new array
@@ -185,21 +182,62 @@ class BasePIVAnalysis:
 
                     # Get neighbors
                     i_min = max(0, i-1)
+                    i_max = min(self.N_vels_in_y, i+2)
+                    j_min = max(0, j-1)
+                    j_max = min(self.N_vels_in_x, j+2)
+                    i_shifts = []
+                    j_shifts = []
+                    for ii in range(i_min, i_max):
+                        for jj in range(j_min, j_max):
+                            if ii != 1 or jj != 1:
+                                i_shifts.append(self.shifts[k,ii,jj,0])
+                                j_shifts.append(self.shifts[k,ii,jj,1])
+
+                    # Get sorted shifts
+                    i_shifts = np.sort(i_shifts)
+                    j_shifts = np.sort(j_shifts)
+
+                    # Get statistics
+                    i_med = np.median(i_shifts[1:-1]).item()
+                    j_med = np.median(j_shifts[1:-1]).item()
+                    i_std = np.std(i_shifts[1:-1]).item()
+                    j_std = np.std(j_shifts[1:-1]).item()
+
+                    # Check
+                    if abs(self.shifts[k,i,j,0]-i_med)/(i_std+e0) > e_thresh or abs(self.shifts[k,i,j,1]-j_med)/(j_std+e0) > e_thresh:
+                        filtered_shifts[i,j,:] = [i_med, j_med]
+                    else:
+                        filtered_shifts[i,j,:] = self.shifts[k,i,j,:]
+
+                prog.display()
+
+            # Replace
+            self.shifts[k] = filtered_shifts
+
+    
+    def apply_mean_filter(self):
+        """Applies mean filtering to the shift array(s).
+        """
+
+        # Initialize new array
+        prog = OneLineProgress(self.N*self.N_vels_in_y, "    Applying mean filter")
+        filtered_shifts = np.zeros_like(self.shifts[0])
+
+        # Loop
+        for k in range(self.N):
+            for i in range(self.N_vels_in_y):
+                for j in range(self.N_vels_in_x):
+
+                    # Get neighbors
+                    i_min = max(0, i-1)
                     i_max = min(self.Ny, i+2)
                     j_min = max(0, j-1)
                     j_max = min(self.Nx, j+2)
 
-                    # Get statistics
-                    i_shift_med = np.median(self.shifts[k,i_min:i_max,j_min:j_max,0].flatten()).item()
-                    j_shift_med = np.median(self.shifts[k,i_min:i_max,j_min:j_max,1].flatten()).item()
-                    i_std = np.std(self.shifts[k,i_min:i_max,j_min:j_max,0].flatten(), ddof=1).item()
-                    j_std = np.std(self.shifts[k,i_min:i_max,j_min:j_max,1].flatten(), ddof=1).item()
-
-                    # Check
-                    if abs(self.shifts[k,i,j,0]-i_shift_med)/(i_std+e0) > e_thresh or abs(self.shifts[k,i,j,1]-j_shift_med)/(j_std+e0) > e_thresh:
-                        filtered_shifts[i,j,:] = [i_shift_med, j_shift_med]
-                    else:
-                        filtered_shifts[i,j,:] = self.shifts[k,i,j,:]
+                    # Average
+                    i_mean = np.average(self.shifts[k,i_min:i_max,j_min:j_max,0].flatten())
+                    j_mean = np.average(self.shifts[k,i_min:i_max,j_min:j_max,1].flatten())
+                    filtered_shifts[i,j,:] = [i_mean, j_mean]
 
                 prog.display()
 
@@ -312,7 +350,7 @@ class BasePIVAnalysis:
         plt.show()
 
 
-    def plot_quiver(self, frame_index, plot_vortiticy=True, color_arrows=False):
+    def plot_quiver(self, frame_index, background='none', color_arrows=False):
         """Plots the velocities at the given frame.
 
         Parameters
@@ -320,8 +358,8 @@ class BasePIVAnalysis:
         frame_index : int
             Data frame to plot from.
 
-        plot_vorticity : bool, optional
-            Whether to include the vorticity in the background. Defaults to True.
+        background : str, optional
+            May be 'velocity', 'vorticity', or 'none'. Defaults to none.
 
         color_arrows : bool, optional
             Whether to set the color of the vectors based on magnitude. Defaults to False.
@@ -337,16 +375,30 @@ class BasePIVAnalysis:
             colors[:,2] = 1.0-colors[:,2]
             colors[:,1] = 0.0
 
+        # Figure out how many of the vectors to actually plot
+        s = self.window_size//self.vector_spacing
+
         # Plot
         plt.figure()
-        if plot_vortiticy:
+
+        # Vorticity background
+        if background == 'vorticity':
             plt.contourf(self.x_vec, self.y_vec, self.zeta[frame_index], levels=20, cmap='bwr')
-            plt.quiver(self.x_vec, self.y_vec, self.V[frame_index,:,:,0], self.V[frame_index,:,:,1], width=0.001)
+            plt.quiver(self.x_vec[::s], self.y_vec[::s], self.V[frame_index,::s,::s,0], self.V[frame_index,::s,::s,1], width=0.001)
+        
+        # Velocity background
+        elif background == 'velocity':
+            plt.contourf(self.x_vec, self.y_vec, np.linalg.norm(self.V[frame_index], axis=-1), levels=20, cmap='bwr')
+            plt.quiver(self.x_vec[::s], self.y_vec[::s], self.V[frame_index,::s,::s,0], self.V[frame_index,::s,::s,1], width=0.001)
+        
+        # No background
         else:
             if color_arrows:
-                plt.quiver(self.x_vec, self.y_vec, self.V[frame_index,:,:,0], self.V[frame_index,:,:,1], color=colors, width=0.001)
+                plt.quiver(self.x_vec[::s], self.y_vec[::s], self.V[frame_index,::s,::s,0], self.V[frame_index,::s,::s,1], color=colors, width=0.001)
             else:
-                plt.quiver(self.x_vec, self.y_vec, self.V[frame_index,:,:,0], self.V[frame_index,:,:,1], width=0.001)
+                plt.quiver(self.x_vec[::s], self.y_vec[::s], self.V[frame_index,::s,::s,0], self.V[frame_index,::s,::s,1], width=0.001)
+        
+        # Misc settings
         plt.gca().axis('equal')
         plt.xlabel('x')
         plt.ylabel('y')
