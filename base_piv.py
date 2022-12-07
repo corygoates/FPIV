@@ -151,9 +151,8 @@ class BasePIVAnalysis:
 
                 # Throw out bad vectors
                 if max_shift_in_pixels is not None:
-                    self.shifts[l,:,:,:] = np.where((np.linalg.norm(self.shifts[l,:,:,:], axis=2, keepdims=True) > max_shift_in_pixels),
-                                                    0.0,
-                                                    self.shifts[l,:,:,:])
+                    self.shifts[l,:,:,:] = np.where(np.linalg.norm(self.shifts[l,:,:,:], axis=2, keepdims=True) > max_shift_in_pixels,
+                                                    0.0, self.shifts[l,:,:,:])
 
             # Filter
             self.apply_median_filter(e_thresh, e0)
@@ -201,7 +200,9 @@ class BasePIVAnalysis:
                     i_shifts = i_shifts[i_sort_ind]
                     j_shifts = j_shifts[j_sort_ind]
 
-                    # Get standard deviation ignoring the two points furthest away
+                    # Get median and standard deviation ignoring the two points furthest away
+                    i_med = np.median(i_shifts[:-2]).item()
+                    j_med = np.median(j_shifts[:-2]).item()
                     i_std = np.std(i_shifts[:-2]).item()
                     j_std = np.std(j_shifts[:-2]).item()
 

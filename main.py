@@ -1,5 +1,7 @@
 import os
+
 import matplotlib.pyplot as plt
+
 from time_series_piv import TimeSeriesPIVAnalysis
 from baseball_piv import BaseballPIVAnalysis
 from paraview_visualization import render_csv_with_paraview
