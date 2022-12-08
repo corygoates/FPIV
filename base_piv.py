@@ -77,8 +77,8 @@ class BasePIVAnalysis:
 
         # Calculate velocities
         self.V = np.zeros_like(self.shifts)
-        self.V[:,:,:,0] = -self.shifts[:,:,:,1]*self.dx/self.dt
-        self.V[:,:,:,1] =  self.shifts[:,:,:,0]*self.dy/self.dt
+        self.V[:,:,:,0] =  self.shifts[:,:,:,1]*self.dx/self.dt
+        self.V[:,:,:,1] = -self.shifts[:,:,:,0]*self.dy/self.dt
 
 
     def calculate_shifts(self, e_thresh, e0, N_passes=0, max_shift_in_pixels=None):
@@ -193,18 +193,14 @@ class BasePIVAnalysis:
                     # Get median values
                     i_med = np.median(i_shifts).item()
                     j_med = np.median(j_shifts).item()
-
-                    # Get sorted shifts
-                    i_sort_ind = np.argsort(abs(i_shifts-i_med))
-                    j_sort_ind = np.argsort(abs(j_shifts-j_med))
-                    i_shifts = i_shifts[i_sort_ind]
-                    j_shifts = j_shifts[j_sort_ind]
+                    
+                    # Get deviations
+                    i_devs = np.sort(np.abs(i_shifts - i_med))
+                    j_devs = np.sort(np.abs(j_shifts - j_med))
 
                     # Get median and standard deviation ignoring the two points furthest away
-                    i_med = np.median(i_shifts[:-2]).item()
-                    j_med = np.median(j_shifts[:-2]).item()
-                    i_std = np.std(i_shifts[:-2]).item()
-                    j_std = np.std(j_shifts[:-2]).item()
+                    i_std = np.median(i_devs).item()
+                    j_std = np.median(j_devs).item()
 
                     # Check
                     if abs(self.shifts[k,i,j,0]-i_med)/(i_std+e0) > e_thresh or abs(self.shifts[k,i,j,1]-j_med)/(j_std+e0) > e_thresh:

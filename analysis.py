@@ -65,7 +65,7 @@ def get_correlation_peak(array1, array2):
         if peak[0]**2 + peak[1]**2 > 2.0:
             peak = [0.0, 0.0]
 
-        return [i_max-array1.shape[0]//2+peak[0], j_max-array1.shape[1]//2+peak[1]]
+        return [-i_max+array1.shape[0]//2+peak[0], -j_max+array1.shape[1]//2+peak[1]]
 
 
 def center_of_fit_gaussian(corr_peak):
