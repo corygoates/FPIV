@@ -19,7 +19,7 @@ if __name__=="__main__":
     #my_piv.write_to_csv("results/synthetic_jet/velocity")
 
     my_piv = BaseballPIVAnalysis("data/baseball_data/baseballs2.tif", dt=10.0e-6, pixel_threshold=10)
-    my_piv.process(2.0, 0.1, 24, vector_spacing=3, N_passes=3)#, max_shift_in_pixels=10)
+    my_piv.process(1.5, 0.1, 24, vector_spacing=3, N_passes=5)#, max_shift_in_pixels=10)
     my_piv.create_velocity_histogram()
     my_piv.plot_slice_in_y(0, -1)
     my_piv.plot_quiver(0, background='velocity')

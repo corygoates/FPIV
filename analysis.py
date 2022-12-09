@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 from image_handling import display_image_array
 
 
-def get_correlation_peak(array1, array2):
-    """Locates the correlation peak between two arrays.
+def get_correlation_peak(array1, array2, gauss_weight=True):
+    """Locates the correlation peak between two arrays (assumed to be square).
     
     Parameters
     ----------
@@ -16,30 +16,44 @@ def get_correlation_peak(array1, array2):
     array2 : ndarray
         Second array.
 
+    gauss_weight : bool, optional
+        Whether to weight the interrogation windows with a Gaussian before calculating the cross-correlation. Defaults to True.
+
     Returns
     -------
     list
         Coordinates of correlation peak.
     """
 
+    # Get dimension
+    N = array1.shape[1]
+
+    # Subtract averages
+    array1 -= np.average(array1.flatten()).item()
+    array2 -= np.average(array2.flatten()).item()
+
+    # Apply Gaussian weighting
+    if gauss_weight:
+        d = 1.0/N
+        eta = np.linspace(-0.5+d, 0.5-d, N)
+        W = np.exp(-8.0*eta**2)
+        W2D = np.einsum('i,j->ij', W, W)
+        array1 += W2D
+        array2 += W2D
+
     # Cross-correlate
-    avg1 = np.average(array1.flatten()).item()
-    avg2 = np.average(array2.flatten()).item()
-    corr = sig.correlate(array1-avg1, array2-avg2, method='fft', mode='same')
+    corr = sig.correlate(array1, array2, method='fft', mode='same')
 
     # Find maximum (we're not going to check the edges here)
-    max_corr = 0.0
-    i_max = -1
-    for  i in range(1, corr.shape[0]-1):
-        for j in range(1, corr.shape[1]-1):
-            if corr[i,j] > max_corr:
-                i_max = i
-                j_max = j
-                max_corr = corr[i,j]
+    max_loc = np.argmax(corr)
+    i_max = max_loc//N
+    j_max = max_loc%N
 
-    # Check if we've found a maximum
-    if i_max == -1:
+    # Check if the maximum is on the edge
+    if i_max == 0 or i_max == corr.shape[0]-1 or j_max == 0 or j_max == corr.shape[1]-1:
         return [0.0, 0.0]
+
+    # If not, get a fit to the peak
     else:
 
         # Get array around peak
@@ -52,14 +66,6 @@ def get_correlation_peak(array1, array2):
 
         # Get subpixel peak location
         peak = center_of_fit_gaussian(peak_array)
-
-        # Plot
-        #if abs(j_max - array1.shape[0]//2) > 3 and abs(i_max - array1.shape[1]//2) > 3:
-        #    plt.figure()
-        #    plt.imshow(corr)
-        #    plt.plot(j_max, i_max, 'x', color='orange')
-        #    plt.plot(j_max+peak[1], i_max+peak[0], 'rx')
-        #    plt.show()
 
         # Reject erroneous peak fits (Shouldn't be further from the original peak than 1 pixel in any direction)
         if peak[0]**2 + peak[1]**2 > 2.0:
