@@ -29,8 +29,8 @@ def get_correlation_peak(array1, array2, gauss_weight=True):
     N = array1.shape[1]
 
     # Subtract averages
-    array1 -= np.average(array1.flatten()).item()
-    array2 -= np.average(array2.flatten()).item()
+    a1 = array1 - np.average(array1.flatten()).item()
+    a2 = array2 - np.average(array2.flatten()).item()
 
     # Apply Gaussian weighting
     if gauss_weight:
@@ -38,11 +38,11 @@ def get_correlation_peak(array1, array2, gauss_weight=True):
         eta = np.linspace(-0.5+d, 0.5-d, N)
         W = np.exp(-8.0*eta**2)
         W2D = np.einsum('i,j->ij', W, W)
-        array1 += W2D
-        array2 += W2D
+        a1 *= W2D
+        a2 *= W2D
 
     # Cross-correlate
-    corr = sig.correlate(array1, array2, method='fft', mode='same')
+    corr = sig.correlate(a1, a2, method='fft', mode='same')
 
     # Find maximum (we're not going to check the edges here)
     max_loc = np.argmax(corr)
@@ -60,7 +60,7 @@ def get_correlation_peak(array1, array2, gauss_weight=True):
         peak_array = corr[i_max-1:i_max+2,j_max-1:j_max+2]
 
         # Move the correlation plane up so the Gaussian fit works
-        min_val = np.min(peak_array.flatten()).item()
+        min_val = np.min(peak_array).item()
         if min_val <= 0.0:
             peak_array -= min_val - 0.1
 

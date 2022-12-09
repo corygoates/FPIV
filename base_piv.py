@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 
 from analysis import get_correlation_peak
 from helpers import OneLineProgress
+from image_handling import display_image_array
 
 class BasePIVAnalysis:
     """Base class for performing PIV analysis."""
