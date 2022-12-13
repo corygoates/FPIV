@@ -65,7 +65,7 @@ class BaseballPIVAnalysis(BasePIVAnalysis):
         self.data = np.where(self.data > pixel_threshold, 0.0, self.data)
 
 
-    def process(self, e_thresh, e0, window_size, vector_spacing, N_passes=1, max_shift_in_pixels=None):
+    def process(self, e_thresh, e0, window_size, vector_spacing, N_passes=1, max_shift_in_pixels=None, gauss_weight=True):
         """Processes the data.
 
         Parameters
@@ -90,13 +90,16 @@ class BaseballPIVAnalysis(BasePIVAnalysis):
         
         max_shift_in_pixels : int, optional
             Displacement threshold for throwing out vectors which are too large. Defaults to keeping all vectors.
+
+        gauss_weight : bool, optional
+            Whether to apply Gaussian window weighting. Defaults to True.
         """
 
         # Determine vector locations
         self.set_up_vectors(window_size, vector_spacing)
 
         # Calculate shifts
-        self.calculate_shifts(e_thresh, e0, N_passes, max_shift_in_pixels=max_shift_in_pixels)
+        self.calculate_shifts(e_thresh, e0, N_passes, max_shift_in_pixels=max_shift_in_pixels, gauss_weight=gauss_weight)
 
         # Compute velocities
         self.convert_shifts_to_velocities()

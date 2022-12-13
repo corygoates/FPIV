@@ -25,10 +25,3 @@ if __name__=="__main__":
     my_piv.plot_quiver(0, background='velocity')
 
     #render_csv_with_paraview("results/baseballs/baseballs1_0.csv", image_name='baseball.png', arrow_scale_factor=0.005)
-
-    ## Test
-    #test1 = np.zeros((6,6))
-    #test2 = np.zeros((6,6))
-    #test1[2,2] = 1.0
-    #test2[4,4] = 1.0
-    #print(get_correlation_peak(test1, test2))

@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 from image_handling import display_image_array
 
 
-def get_correlation_peak(array1, array2):
-    """Locates the correlation peak between two arrays.
+def get_correlation_peak(array1, array2, gauss_weight=True):
+    """Locates the correlation peak between two arrays (assumed to be square).
     
     Parameters
     ----------
@@ -16,27 +16,44 @@ def get_correlation_peak(array1, array2):
     array2 : ndarray
         Second array.
 
+    gauss_weight : bool, optional
+        Whether to weight the interrogation windows with a Gaussian before calculating the cross-correlation. Defaults to True.
+
     Returns
     -------
     list
         Coordinates of correlation peak.
     """
 
+    # Get dimension
+    N = array1.shape[1]
+
+    # Subtract averages
+    a1 = array1 - np.average(array1.flatten()).item()
+    a2 = array2 - np.average(array2.flatten()).item()
+
+    # Apply Gaussian weighting
+    if gauss_weight:
+        d = 1.0/N
+        eta = np.linspace(-0.5+d, 0.5-d, N)
+        W = np.exp(-8.0*eta**2)
+        W2D = np.einsum('i,j->ij', W, W)
+        a1 *= W2D
+        a2 *= W2D
+
     # Cross-correlate
-    avg1 = np.average(array1.flatten()).item()
-    avg2 = np.average(array2.flatten()).item()
-    corr = sig.correlate(array1-avg1, array2-avg2, method='fft', mode='same')
+    corr = sig.correlate(a1, a2, method='fft', mode='same')
 
     # Find maximum (we're not going to check the edges here)
     max_loc = np.argmax(corr)
-    i_max = max_loc//(corr.shape[0])
-    j_max = max_loc%(corr.shape[1])
+    i_max = max_loc//N
+    j_max = max_loc%N
 
-    # Check if the maximum as at the edges, in which case we reject the result
-    if i_max == 0 or j_max == 0 or i_max == corr.shape[0]-1 or j_max == corr.shape[1]-1:
+    # Check if the maximum is on the edge
+    if i_max == 0 or i_max == N-1 or j_max == 0 or j_max == N-1:
         return [0.0, 0.0]
 
-    # Otherwise, get correlation peak
+    # If not, get a fit to the peak
     else:
 
         # Get array around peak

@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 
 from analysis import get_correlation_peak
 from helpers import OneLineProgress
+from image_handling import display_image_array
 
 class BasePIVAnalysis:
     """Base class for performing PIV analysis."""
@@ -81,7 +82,7 @@ class BasePIVAnalysis:
         self.V[:,:,:,1] = -self.shifts[:,:,:,0]*self.dy/self.dt
 
 
-    def calculate_shifts(self, e_thresh, e0, N_passes=0, max_shift_in_pixels=None):
+    def calculate_shifts(self, e_thresh, e0, N_passes=0, max_shift_in_pixels=None, gauss_weight=True):
         """Calculates the shift fields between the raw data.
         
         Parameters
@@ -97,6 +98,9 @@ class BasePIVAnalysis:
         
         max_shift_in_pixels : int, optional
             Displacement threshold for throwing out vectors which are too large. Defaults to keeping all vectors.
+        
+        gauss_weight : bool, optional
+            Whether to apply Gaussian window weighting. Defaults to True.
         """
 
         # Initialize storage
@@ -143,7 +147,7 @@ class BasePIVAnalysis:
                         window2 = self.data[l+1,j0+j_shift:j1+j_shift,k0+k_shift:k1+k_shift]
 
                         # Cross-correlate
-                        self.shifts[l,j,k,:] = get_correlation_peak(window1, window2)
+                        self.shifts[l,j,k,:] = get_correlation_peak(window1, window2, gauss_weight=gauss_weight)
                         self.shifts[l,j,k,0] += j_shift
                         self.shifts[l,j,k,1] += k_shift
 
@@ -198,7 +202,7 @@ class BasePIVAnalysis:
                     i_devs = np.sort(np.abs(i_shifts - i_med))
                     j_devs = np.sort(np.abs(j_shifts - j_med))
 
-                    # Get median deviation
+                    # Get median and standard deviation ignoring the two points furthest away
                     i_med_dev = np.median(i_devs).item()
                     j_med_dev = np.median(j_devs).item()
 
@@ -401,4 +405,5 @@ class BasePIVAnalysis:
         plt.gca().axis('equal')
         plt.xlabel('x')
         plt.ylabel('y')
+        plt.tight_layout()
         plt.show()
