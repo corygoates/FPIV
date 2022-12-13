@@ -19,7 +19,7 @@ if __name__=="__main__":
     #my_piv.write_to_csv("results/synthetic_jet/velocity")
 
     my_piv = BaseballPIVAnalysis("data/baseball_data/baseballs2.tif", dt=10.0e-6, pixel_threshold=10)
-    my_piv.process(2.0, 0.1, 24, vector_spacing=3, N_passes=3)#, max_shift_in_pixels=10)
+    my_piv.process(1.0, 0.1, 24, vector_spacing=3, N_passes=5)#, max_shift_in_pixels=10)
     my_piv.create_velocity_histogram()
     my_piv.plot_slice_in_y(0, -1)
     my_piv.plot_quiver(0, background='velocity')
@@ -29,6 +29,6 @@ if __name__=="__main__":
     ## Test
     #test1 = np.zeros((6,6))
     #test2 = np.zeros((6,6))
-    #test1[1,1] = 1.0
-    #test2[2,2] = 1.0
+    #test1[2,2] = 1.0
+    #test2[4,4] = 1.0
     #print(get_correlation_peak(test1, test2))

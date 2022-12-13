@@ -198,12 +198,12 @@ class BasePIVAnalysis:
                     i_devs = np.sort(np.abs(i_shifts - i_med))
                     j_devs = np.sort(np.abs(j_shifts - j_med))
 
-                    # Get median and standard deviation ignoring the two points furthest away
-                    i_std = np.median(i_devs).item()
-                    j_std = np.median(j_devs).item()
+                    # Get median deviation
+                    i_med_dev = np.median(i_devs).item()
+                    j_med_dev = np.median(j_devs).item()
 
                     # Check
-                    if abs(self.shifts[k,i,j,0]-i_med)/(i_std+e0) > e_thresh or abs(self.shifts[k,i,j,1]-j_med)/(j_std+e0) > e_thresh:
+                    if abs(self.shifts[k,i,j,0]-i_med)/(i_med_dev+e0) > e_thresh or abs(self.shifts[k,i,j,1]-j_med)/(j_med_dev+e0) > e_thresh:
                         filtered_shifts[i,j,:] = [i_med, j_med]
                     else:
                         filtered_shifts[i,j,:] = self.shifts[k,i,j,:]

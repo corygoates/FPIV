@@ -28,38 +28,27 @@ def get_correlation_peak(array1, array2):
     corr = sig.correlate(array1-avg1, array2-avg2, method='fft', mode='same')
 
     # Find maximum (we're not going to check the edges here)
-    max_corr = 0.0
-    i_max = -1
-    for  i in range(1, corr.shape[0]-1):
-        for j in range(1, corr.shape[1]-1):
-            if corr[i,j] > max_corr:
-                i_max = i
-                j_max = j
-                max_corr = corr[i,j]
+    max_loc = np.argmax(corr)
+    i_max = max_loc//(corr.shape[0])
+    j_max = max_loc%(corr.shape[1])
 
-    # Check if we've found a maximum
-    if i_max == -1:
+    # Check if the maximum as at the edges, in which case we reject the result
+    if i_max == 0 or j_max == 0 or i_max == corr.shape[0]-1 or j_max == corr.shape[1]-1:
         return [0.0, 0.0]
+
+    # Otherwise, get correlation peak
     else:
 
         # Get array around peak
         peak_array = corr[i_max-1:i_max+2,j_max-1:j_max+2]
 
         # Move the correlation plane up so the Gaussian fit works
-        min_val = np.min(peak_array.flatten()).item()
+        min_val = np.min(peak_array).item()
         if min_val <= 0.0:
             peak_array -= min_val - 0.1
 
         # Get subpixel peak location
         peak = center_of_fit_gaussian(peak_array)
-
-        # Plot
-        #if abs(j_max - array1.shape[0]//2) > 3 and abs(i_max - array1.shape[1]//2) > 3:
-        #    plt.figure()
-        #    plt.imshow(corr)
-        #    plt.plot(j_max, i_max, 'x', color='orange')
-        #    plt.plot(j_max+peak[1], i_max+peak[0], 'rx')
-        #    plt.show()
 
         # Reject erroneous peak fits (Shouldn't be further from the original peak than 1 pixel in any direction)
         if peak[0]**2 + peak[1]**2 > 2.0:
